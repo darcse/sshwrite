@@ -89,15 +89,15 @@ export function BinderItem({ doc, depth, renderNested }: BinderItemProps) {
   const isFolderOver = dropPosition === 'into' && doc.type === 'folder'
 
   const selected = selectedDocId === doc.id
-  const label = getLabel(doc.label)
+  const labelId = ((doc as unknown as { label_id?: string | null }).label_id ?? doc.label) ?? null
+  const label = getLabel(labelId)
   const documentFileColor =
     doc.type === 'document'
-      ? (label?.color ??
-        (doc.status === 'writing'
-          ? '#007AFF'
-          : doc.status === 'done'
-            ? '#34C759'
-            : 'var(--muted)'))
+      ? (doc.status === 'writing'
+        ? '#007AFF'
+        : doc.status === 'done'
+          ? '#34C759'
+          : 'var(--muted)')
       : undefined
 
   const folderIconColor = isFolderOver ? '#007AFF' : '#F5A623'
@@ -209,12 +209,21 @@ export function BinderItem({ doc, depth, renderNested }: BinderItemProps) {
             aria-hidden
           />
         ) : (
-          <File
-            className="h-4 w-4 shrink-0"
-            style={{ color: documentFileColor }}
-            strokeWidth={2}
-            aria-hidden
-          />
+          <>
+            {label ? (
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: label.color }}
+                aria-hidden
+              />
+            ) : null}
+            <File
+              className="h-4 w-4 shrink-0"
+              style={{ color: documentFileColor }}
+              strokeWidth={2}
+              aria-hidden
+            />
+          </>
         )}
         {editing ? (
           <input

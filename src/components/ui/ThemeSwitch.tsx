@@ -15,6 +15,11 @@ function applyTheme(mode: ThemeMode) {
 
 export function ThemeSwitch() {
   const [mode, setMode] = useState<ThemeMode>('auto')
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     try {
@@ -37,6 +42,8 @@ export function ThemeSwitch() {
     applyTheme(next)
   }, [])
 
+  if (!mounted) return null
+
   return (
     <div
       className="flex items-center gap-0.5 rounded-[10px] border p-0.5"
@@ -46,6 +53,7 @@ export function ThemeSwitch() {
       }}
       role="group"
       aria-label="테마"
+      suppressHydrationWarning
     >
       {(['light', 'dark', 'auto'] as const).map((m) => (
         <button

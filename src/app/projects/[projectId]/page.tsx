@@ -2,7 +2,17 @@
 
 import { BinderProvider, BinderTree, useBinderContext } from '@/components/binder/BinderTree'
 import { Editor } from '@/components/editor/Editor'
-import { FilePlus, FolderPlus } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import {
+  CheckCircle2,
+  Circle,
+  Expand,
+  FilePlus,
+  FolderPlus,
+  PenLine,
+  Shrink,
+  X,
+} from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -28,6 +38,15 @@ const MIN_PANEL = 160
 const MIN_EDITOR = 200
 const SPLITTER_PX = 6
 const COLLAPSE_RAIL_PX = 28
+const LABEL_COLORS = [
+  '#ff3b30',
+  '#ff9500',
+  '#ffcc00',
+  '#34c759',
+  '#007aff',
+  '#5856d6',
+  '#ff2d55',
+]
 
 function BinderPanelToggleIcon() {
   return (
@@ -92,8 +111,8 @@ function BinderHeaderBar({ onCollapse }: { onCollapse: () => void }) {
   }
 
   return (
-    <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--card-bg)] px-2">
-      <span className="text-sm font-medium text-[var(--foreground)]">바인더</span>
+    <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--card-bg)] px-4">
+      <span className="text-sm font-medium text-[var(--foreground)]">Binder</span>
       <div className="flex items-center gap-0.5">
         <button
           type="button"
@@ -131,10 +150,24 @@ function BinderHeaderBar({ onCollapse }: { onCollapse: () => void }) {
 function EditorPanel() {
   const { documents, selectedDocId } = useBinderContext()
   const doc = selectedDocId ? documents.find((d) => d.id === selectedDocId) : undefined
+  const [focusMode, setFocusMode] = useState(false)
   return (
     <>
-      <div className="flex h-12 min-w-0 shrink-0 items-center border-b border-[var(--border)] bg-[var(--card-bg)] px-3 text-sm font-medium text-[var(--foreground)]">
-        <span className="truncate">{doc ? doc.title : '문서를 선택하세요'}</span>
+      <div className="flex h-12 min-w-0 shrink-0 items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--card-bg)] px-3 text-sm font-medium text-[var(--foreground)]">
+        <span className="min-w-0 flex-1 truncate">{doc ? doc.title : '문서를 선택하세요'}</span>
+        <button
+          type="button"
+          className="shrink-0 rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
+          onClick={() => setFocusMode((v) => !v)}
+          aria-label={focusMode ? '포커스 해제' : '포커스 모드'}
+          title={focusMode ? '포커스 해제' : '포커스 모드'}
+        >
+          {focusMode ? (
+            <Shrink className="h-5 w-5" strokeWidth={2} aria-hidden />
+          ) : (
+            <Expand className="h-5 w-5" strokeWidth={2} aria-hidden />
+          )}
+        </button>
       </div>
       <div
         className="flex min-h-0 flex-1 flex-col overflow-hidden p-4"
@@ -153,6 +186,8 @@ function EditorPanel() {
             key={doc.id}
             documentId={doc.id}
             initialContent={doc.content}
+            focusMode={focusMode}
+            onFocusModeChange={setFocusMode}
           />
         )}
       </div>
@@ -161,16 +196,124 @@ function EditorPanel() {
 }
 
 function InspectorPanel() {
-  const { documents, labels, selectedDocId, updateDocument, loading } =
+  const { projectId, documents, labels, selectedDocId, updateDocument, refresh, loading } =
     useBinderContext()
   const [saving, setSaving] = useState(false)
+  const [labelColor, setLabelColor] = useState(LABEL_COLORS[0])
+  const [labelName, setLabelName] = useState('')
+  const [synopsisDraft, setSynopsisDraft] = useState('')
+  const [memoDraft, setMemoDraft] = useState('')
   const doc = selectedDocId ? documents.find((d) => d.id === selectedDocId) : undefined
+  const docLabelId =
+    ((doc as unknown as { label_id?: string | null })?.label_id ?? doc?.label) ?? null
+  const selectedLabel = labels.find((l) => l.id === docLabelId)
 
   async function patch(p: Parameters<typeof updateDocument>[1]) {
     if (!doc) return
     setSaving(true)
     await updateDocument(doc.id, p)
     setSaving(false)
+  }
+
+  useEffect(() => {
+    if (!doc || doc.type !== 'document') return
+    setSynopsisDraft(doc.synopsis ?? '')
+    setMemoDraft(((doc as unknown as { memo?: string | null }).memo ?? '') as string)
+    if (selectedLabel) {
+      setLabelColor(selectedLabel.color)
+      setLabelName(selectedLabel.name)
+    } else {
+      setLabelColor(LABEL_COLORS[0])
+      setLabelName('')
+    }
+  }, [doc?.id, doc?.synopsis, doc?.label, selectedLabel?.id, selectedLabel?.color, selectedLabel?.name])
+
+  useEffect(() => {
+    if (!doc || doc.type !== 'document') return
+    const timer = setTimeout(() => {
+      const next = synopsisDraft.trim()
+      if ((doc.synopsis ?? '') === next) return
+      void patch({ synopsis: next || null })
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [synopsisDraft, doc?.id])
+
+  useEffect(() => {
+    if (!doc || doc.type !== 'document') return
+    const timer = setTimeout(async () => {
+      const next = memoDraft.trim()
+      const current = ((doc as unknown as { memo?: string | null }).memo ?? '') as string
+      if (current === next) return
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
+      await supabase
+        .from('write_documents')
+        .update({ memo: next || null } as Record<string, unknown>)
+        .eq('id', doc.id)
+        .eq('user_id', user.id)
+      await refresh()
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [memoDraft, doc?.id, refresh])
+
+  async function saveLabel() {
+    if (!doc || doc.type !== 'document') return
+    const nextName = labelName.trim()
+    if (!nextName) return
+    setSaving(true)
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      setSaving(false)
+      return
+    }
+    if (selectedLabel) {
+      await supabase
+        .from('write_document_labels')
+        .update({ name: nextName, color: labelColor })
+        .eq('id', selectedLabel.id)
+        .eq('user_id', user.id)
+      await supabase
+        .from('write_documents')
+        .update({ label_id: selectedLabel.id } as Record<string, unknown>)
+        .eq('id', doc.id)
+        .eq('user_id', user.id)
+      await refresh()
+      setSaving(false)
+      return
+    }
+    const { data } = await supabase
+      .from('write_document_labels')
+      .insert({
+        project_id: projectId,
+        user_id: user.id,
+        name: nextName,
+        color: labelColor,
+      })
+      .select('id')
+      .single()
+    if (data?.id) {
+      await supabase
+        .from('write_documents')
+        .update({ label_id: data.id } as Record<string, unknown>)
+        .eq('id', doc.id)
+        .eq('user_id', user.id)
+      await refresh()
+      setSaving(false)
+    } else {
+      setSaving(false)
+    }
+  }
+
+  async function clearLabel() {
+    if (!doc || doc.type !== 'document') return
+    setLabelName('')
+    await patch({ label: null })
   }
 
   if (loading) {
@@ -186,37 +329,127 @@ function InspectorPanel() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <label className="flex flex-col gap-1 text-sm">
-        <span className="text-[var(--muted)]">상태</span>
-        <select
-          value={doc.status}
-          disabled={saving}
-          onChange={(e) => patch({ status: e.target.value })}
-          className="rounded border border-[var(--border)] bg-[var(--card-bg)] px-2 py-1.5 text-[var(--foreground)]"
-        >
-          <option value="todo">할 일</option>
-          <option value="writing">작성 중</option>
-          <option value="done">완료</option>
-        </select>
+        <span className="text-[var(--muted)]">시놉시스</span>
+        <textarea
+          rows={3}
+          value={synopsisDraft}
+          onChange={(e) => setSynopsisDraft(e.target.value)}
+          placeholder="시놉시스를 입력하세요"
+          className="input-apple w-full resize-none px-2 py-1.5 text-sm"
+        />
       </label>
       <label className="flex flex-col gap-1 text-sm">
+        <span className="text-[var(--muted)]">상태</span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => patch({ status: 'todo' })}
+            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors disabled:opacity-50"
+            style={{
+              backgroundColor: doc.status === 'todo' ? 'var(--badge-bg)' : 'transparent',
+              color: 'var(--foreground)',
+            }}
+          >
+            <Circle className="h-3.5 w-3.5" style={{ color: 'var(--muted)' }} aria-hidden />
+            예정
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => patch({ status: 'writing' })}
+            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors disabled:opacity-50"
+            style={{
+              backgroundColor: doc.status === 'writing' ? 'var(--badge-bg)' : 'transparent',
+              color: 'var(--foreground)',
+            }}
+          >
+            <PenLine className="h-3.5 w-3.5" style={{ color: '#007AFF' }} aria-hidden />
+            작성 중
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => patch({ status: 'done' })}
+            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors disabled:opacity-50"
+            style={{
+              backgroundColor: doc.status === 'done' ? 'var(--badge-bg)' : 'transparent',
+              color: 'var(--foreground)',
+            }}
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" style={{ color: '#34C759' }} aria-hidden />
+            완료
+          </button>
+        </div>
+      </label>
+      <div className="flex flex-col gap-1 text-sm">
         <span className="text-[var(--muted)]">라벨</span>
-        <select
-          value={doc.label ?? ''}
-          disabled={saving}
-          onChange={(e) =>
-            patch({ label: e.target.value ? e.target.value : null })
-          }
-          className="rounded border border-[var(--border)] bg-[var(--card-bg)] px-2 py-1.5 text-[var(--foreground)]"
-        >
-          <option value="">없음</option>
-          {labels.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.name}
-            </option>
+        <div className="flex items-center gap-2">
+          {LABEL_COLORS.map((color) => (
+            <button
+              key={color}
+              type="button"
+              onClick={() => setLabelColor(color)}
+              className="h-4 w-4 rounded-full"
+              style={{
+                backgroundColor: color,
+                border:
+                  labelColor === color
+                    ? '2px solid var(--foreground)'
+                    : '1px solid color-mix(in srgb, var(--foreground) 20%, transparent)',
+              }}
+              aria-label={`라벨 색상 ${color}`}
+            />
           ))}
-        </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={labelName}
+            onChange={(e) => setLabelName(e.target.value)}
+            placeholder="라벨 이름"
+            className="input-apple min-w-0 flex-1 px-2 py-1.5 text-sm"
+          />
+          <button
+            type="button"
+            onClick={saveLabel}
+            disabled={saving || !labelName.trim()}
+            className="rounded px-2 py-1 text-xs text-[var(--foreground)] disabled:opacity-50"
+            style={{ backgroundColor: 'var(--badge-bg)' }}
+          >
+            저장
+          </button>
+          <button
+            type="button"
+            onClick={clearLabel}
+            disabled={saving || !doc.label}
+            className="rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)] disabled:opacity-50"
+            aria-label="라벨 제거"
+          >
+            <X className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        </div>
+        {selectedLabel ? (
+          <div className="flex items-center gap-2 text-xs">
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: selectedLabel.color }}
+            />
+            <span className="text-[var(--foreground)]">{selectedLabel.name}</span>
+          </div>
+        ) : null}
+      </div>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="text-[var(--muted)]">메모</span>
+        <textarea
+          rows={5}
+          value={memoDraft}
+          onChange={(e) => setMemoDraft(e.target.value)}
+          placeholder="메모를 입력하세요"
+          className="input-apple w-full resize-none px-2 py-1.5 text-sm"
+        />
       </label>
       {saving ? <p className="text-xs text-[var(--muted)]">저장 중…</p> : null}
     </div>
@@ -462,7 +695,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
           data-panel="inspector"
         >
           <div className="flex h-12 shrink-0 items-center border-b border-[var(--border)] px-3 text-sm font-medium text-[var(--foreground)]">
-            인스펙터
+            Inspector
           </div>
           <div className="min-h-0 flex-1 overflow-auto p-3 text-sm text-[var(--muted)]">
             <InspectorPanel />

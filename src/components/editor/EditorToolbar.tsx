@@ -7,21 +7,30 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
 
   const btn = (active: boolean) =>
     ({
-      borderWidth: 1,
-      borderStyle: 'solid' as const,
-      borderColor: 'var(--border-color)',
-      backgroundColor: active ? 'var(--accent-color)' : 'var(--card-bg)',
-      color: active ? '#fff' : 'var(--foreground)',
-      borderRadius: 6,
-      padding: '4px 8px',
+      backgroundColor: active ? 'var(--badge-bg)' : 'transparent',
+      color: active ? 'var(--foreground)' : 'var(--muted)',
+      borderRadius: 4,
+      padding: '4px 6px',
       fontSize: 12,
       fontWeight: 600,
-    })
+      lineHeight: '16px',
+    }) as const
+
+  const sep = (
+    <span
+      aria-hidden
+      className="mx-1 inline-block w-px"
+      style={{ height: 16, backgroundColor: 'var(--border)' }}
+    />
+  )
 
   return (
     <div
-      className="flex flex-wrap gap-1 border-b pb-2 mb-2 shrink-0"
-      style={{ borderColor: 'var(--border-color)' }}
+      className="flex w-full flex-wrap items-center gap-1 shrink-0 border-b px-2 py-2"
+      style={{
+        backgroundColor: 'var(--card-bg)',
+        borderColor: 'var(--border)',
+      }}
     >
       <button
         type="button"
@@ -37,6 +46,14 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
       >
         I
       </button>
+      <button
+        type="button"
+        style={btn(editor.isActive('strike'))}
+        onClick={() => editor.chain().focus().toggleStrike().run()}
+      >
+        S
+      </button>
+      {sep}
       <button
         type="button"
         style={btn(editor.isActive('heading', { level: 1 }))}
@@ -58,6 +75,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
       >
         H3
       </button>
+      {sep}
       <button
         type="button"
         style={btn(editor.isActive('bulletList'))}
@@ -71,6 +89,28 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
       >
         1.
+      </button>
+      {sep}
+      <button
+        type="button"
+        style={btn(editor.isActive('blockquote'))}
+        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+      >
+        &gt;
+      </button>
+      <button
+        type="button"
+        style={btn(editor.isActive('code'))}
+        onClick={() => editor.chain().focus().toggleCode().run()}
+      >
+        {'</>'}
+      </button>
+      <button
+        type="button"
+        style={btn(false)}
+        onClick={() => editor.chain().focus().setHorizontalRule().run()}
+      >
+        —
       </button>
     </div>
   )
