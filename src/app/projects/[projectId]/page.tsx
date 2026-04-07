@@ -1,6 +1,7 @@
 'use client'
 
 import { BinderProvider, BinderTree, useBinderContext } from '@/components/binder/BinderTree'
+import { Editor } from '@/components/editor/Editor'
 import {
   useCallback,
   useEffect,
@@ -82,16 +83,22 @@ function EditorPanel() {
         {doc ? doc.title : '문서를 선택하세요'}
       </div>
       <div
-        className="min-h-0 flex-1 overflow-auto p-4"
+        className="flex min-h-0 flex-1 flex-col overflow-hidden p-4"
         style={{
           backgroundColor: 'var(--surface-color)',
           color: 'var(--text-secondary)',
         }}
       >
-        {!doc || doc.type === 'folder' ? (
+        {!doc ? (
+          <p>문서를 선택하세요</p>
+        ) : doc.type === 'folder' ? (
           <p>폴더는 여기에 본문이 없습니다. 문서를 선택하세요.</p>
         ) : (
-          <p>문서 내용</p>
+          <Editor
+            key={doc.id}
+            documentId={doc.id}
+            initialContent={doc.content}
+          />
         )}
       </div>
     </>

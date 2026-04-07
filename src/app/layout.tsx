@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/client'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import './globals.css'
 
@@ -46,7 +47,17 @@ function HeaderBar() {
   }
 
   return (
-    <header className="flex items-center justify-end border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+    <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+      <Link
+        href="/"
+        style={{
+          fontWeight: 600,
+          fontSize: '18px',
+          color: 'var(--foreground)',
+        }}
+      >
+        My Works
+      </Link>
       {ready && userPresent ? (
         <button
           type="button"

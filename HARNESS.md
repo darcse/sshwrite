@@ -29,6 +29,7 @@ feature_list/
 ├── ui.json           ← 레이아웃, 코르크보드, 뷰 전환
 ├── ai.json           ← AI 어시스턴트 기능
 └── auth.json         ← 인증, 설정
+├── bugs.json         ← 버그 수정 항목 (BUG- prefix)
 ```
 
 ### ID 규칙
