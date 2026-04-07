@@ -27,7 +27,7 @@ export default function DashboardPage() {
     }
     const { data, error } = await supabase
       .from('write_projects')
-      .select('id, title, description')
+      .select('id, title, description, cover_color, updated_at')
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
     setListLoading(false)
@@ -79,17 +79,14 @@ export default function DashboardPage() {
   }
 
   return (
-    <main
-      className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 py-8"
-      style={{ color: 'var(--text-primary)' }}
-    >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-semibold">대시보드</h1>
+    <main className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-8 bg-[var(--background)] px-4 py-10">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <h1 className="page-title">Projects</h1>
         {userId ? (
           <button
             type="button"
             onClick={openCreate}
-            className="btn-primary shrink-0 rounded px-4 py-2 text-sm font-medium"
+            className="btn-apple btn-apple-primary shrink-0 px-5 py-2.5 text-sm font-semibold"
           >
             새 프로젝트
           </button>
@@ -97,21 +94,18 @@ export default function DashboardPage() {
       </div>
 
       {!userId && !listLoading ? (
-        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          프로젝트를 보려면 로그인해 주세요.
-        </p>
+        <p className="text-sm text-[var(--muted)]">프로젝트를 보려면 로그인해 주세요.</p>
       ) : null}
 
       {listLoading ? (
-        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          불러오는 중…
-        </p>
+        <p className="text-sm text-[var(--muted)]">불러오는 중…</p>
       ) : userId && projects.length === 0 ? (
-        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          아직 프로젝트가 없습니다. 새 프로젝트를 만들어 보세요.
-        </p>
+        <div className="empty-state-apple flex flex-col items-center justify-center gap-2 px-6 py-16 text-center">
+          <p className="text-[var(--foreground)]">아직 프로젝트가 없습니다.</p>
+          <p className="text-sm text-[var(--muted)]">새 프로젝트를 만들어 보세요.</p>
+        </div>
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {projects.map((p) => (
             <li key={p.id}>
               <ProjectCard

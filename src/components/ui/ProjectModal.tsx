@@ -7,6 +7,8 @@ export type ProjectModalProject = {
   id: string
   title: string
   description: string | null
+  cover_color?: string | null
+  updated_at?: string | null
 }
 
 type ProjectModalProps = {
@@ -89,8 +91,7 @@ export function ProjectModal({ open, mode, project, onClose, onSaved }: ProjectM
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
+      className="modal-overlay-apple fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="project-modal-title"
@@ -99,55 +100,36 @@ export function ProjectModal({ open, mode, project, onClose, onSaved }: ProjectM
       }}
     >
       <div
-        className="w-full max-w-md rounded-lg border p-6 shadow-lg"
-        style={{
-          backgroundColor: 'var(--surface-color)',
-          borderColor: 'var(--border-color)',
-          borderRadius: 'var(--radius-md)',
-        }}
+        className="modal-panel-apple w-full max-w-md p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2
-          id="project-modal-title"
-          className="mb-4 text-lg font-semibold"
-          style={{ color: 'var(--text-primary)' }}
-        >
+        <h2 id="project-modal-title" className="mb-4 text-lg font-semibold text-[var(--foreground)]">
           {mode === 'create' ? '새 프로젝트' : '프로젝트 수정'}
         </h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <label className="flex flex-col gap-1 text-sm">
-            <span style={{ color: 'var(--text-secondary)' }}>제목</span>
+            <span className="text-[var(--muted)]">제목</span>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               disabled={saving}
-              className="rounded border px-3 py-2"
-              style={{
-                borderColor: 'var(--border-color)',
-                backgroundColor: 'var(--bg-color)',
-                color: 'var(--text-primary)',
-              }}
+              className="input-apple w-full px-3 py-2"
               autoFocus
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            <span style={{ color: 'var(--text-secondary)' }}>설명 (선택)</span>
+            <span className="text-[var(--muted)]">설명 (선택)</span>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               disabled={saving}
               rows={4}
-              className="resize-y rounded border px-3 py-2"
-              style={{
-                borderColor: 'var(--border-color)',
-                backgroundColor: 'var(--bg-color)',
-                color: 'var(--text-primary)',
-              }}
+              className="input-apple w-full resize-y px-3 py-2"
             />
           </label>
           {error ? (
-            <p className="text-sm" style={{ color: '#b91c1c' }} role="alert">
+            <p className="text-sm text-[#ff3b30]" role="alert">
               {error}
             </p>
           ) : null}
@@ -156,21 +138,14 @@ export function ProjectModal({ open, mode, project, onClose, onSaved }: ProjectM
               type="button"
               onClick={() => !saving && onClose()}
               disabled={saving}
-              className="rounded px-4 py-2 text-sm font-medium disabled:opacity-50"
-              style={{
-                borderWidth: 1,
-                borderStyle: 'solid',
-                borderColor: 'var(--border-color)',
-                color: 'var(--text-secondary)',
-                backgroundColor: 'var(--surface-color)',
-              }}
+              className="btn-apple btn-apple-secondary px-4 py-2 text-sm disabled:opacity-50"
             >
               취소
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="btn-primary rounded px-4 py-2 text-sm font-medium disabled:opacity-50"
+              className="btn-apple btn-apple-primary px-4 py-2 text-sm font-semibold disabled:opacity-50"
             >
               {saving ? '저장 중…' : '저장'}
             </button>
