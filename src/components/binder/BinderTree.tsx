@@ -2,14 +2,20 @@
 
 import {
   DndContext,
+  DragOverlay,
+  type DragCancelEvent,
   type DragEndEvent,
+  type DragMoveEvent,
+  type DragOverEvent,
+  type DragStartEvent,
   PointerSensor,
+  closestCenter,
+  pointerWithin,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
 import {
   SortableContext,
-  arrayMove,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { createClient } from '@/lib/supabase/client'
@@ -20,10 +26,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { File, Folder } from 'lucide-react'
 
 export type DocRow = {
   id: string
@@ -46,12 +54,19 @@ export type LabelRow = {
   color: string
 }
 
+export type DragOverInfo = {
+  id: string
+  position: 'before' | 'after' | 'into'
+} | null
+
 type BinderContextValue = {
   projectId: string
   documents: DocRow[]
   labels: LabelRow[]
   loading: boolean
   selectedDocId: string | null
+  activeId: string | null
+  dragOverInfo: DragOverInfo
   refresh: () => Promise<void>
   createDocument: () => Promise<void>
   createFolder: () => Promise<void>
@@ -103,6 +118,52 @@ function isDescendant(docs: DocRow[], ancestorId: string, nodeId: string) {
   return false
 }
 
+function DragPreview({ doc }: { doc: DocRow }) {
+  return (
+    <div
+      style={{
+        height: 32,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        paddingInline: 8,
+        borderRadius: 6,
+        backgroundColor: 'var(--card-bg)',
+        border: '1px solid var(--border)',
+        fontSize: 14,
+        color: 'var(--foreground)',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        cursor: 'grabbing',
+        userSelect: 'none',
+        minWidth: 120,
+        maxWidth: 240,
+      }}
+    >
+      {doc.type === 'folder' ? (
+        <Folder
+          style={{ width: 16, height: 16, color: '#F5A623', flexShrink: 0 }}
+          strokeWidth={2}
+        />
+      ) : (
+        <File
+          style={{ width: 16, height: 16, color: 'var(--muted)', flexShrink: 0 }}
+          strokeWidth={2}
+        />
+      )}
+      <span
+        style={{
+          flexShrink: 1,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {doc.title}
+      </span>
+    </div>
+  )
+}
+
 export function BinderProvider({
   projectId,
   children,
@@ -117,6 +178,9 @@ export function BinderProvider({
   const [documents, setDocuments] = useState<DocRow[]>([])
   const [labels, setLabels] = useState<LabelRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [dragOverInfo, setDragOverInfo] = useState<DragOverInfo>(null)
+  const dragOverInfoRef = useRef<DragOverInfo>(null)
 
   const refresh = useCallback(async () => {
     const supabase = createClient()
@@ -286,12 +350,93 @@ export function BinderProvider({
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   )
 
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveId(String(event.active.id))
+  }, [])
+
+  const updateDragOverInfo = useCallback(
+    (active: { rect: { current: { translated: { top: number; height: number } | null } } }, over: { id: string | number; rect: { top: number; height: number } } | null) => {
+      if (!over) {
+        if (dragOverInfoRef.current !== null) {
+          dragOverInfoRef.current = null
+          setDragOverInfo(null)
+        }
+        return
+      }
+
+      const oid = String(over.id)
+      const overDoc = byId(documents, oid)
+      if (!overDoc) {
+        if (dragOverInfoRef.current !== null) {
+          dragOverInfoRef.current = null
+          setDragOverInfo(null)
+        }
+        return
+      }
+
+      const activeRect = active.rect.current.translated
+      if (!activeRect) return
+
+      const activeCenterY = activeRect.top + activeRect.height / 2
+      const overRect = over.rect
+
+      let position: 'before' | 'after' | 'into'
+      if (overDoc.type === 'folder') {
+        if (activeCenterY < overRect.top + overRect.height * 0.3) {
+          position = 'before'
+        } else if (activeCenterY > overRect.top + overRect.height * 0.7) {
+          position = 'after'
+        } else {
+          position = 'into'
+        }
+      } else {
+        position = activeCenterY < overRect.top + overRect.height / 2 ? 'before' : 'after'
+      }
+
+      const prev = dragOverInfoRef.current
+      if (prev?.id !== oid || prev?.position !== position) {
+        const info: DragOverInfo = { id: oid, position }
+        dragOverInfoRef.current = info
+        setDragOverInfo(info)
+      }
+    },
+    [documents]
+  )
+
+  const handleDragOver = useCallback(
+    (event: DragOverEvent) => {
+      updateDragOverInfo(event.active, event.over)
+    },
+    [updateDragOverInfo]
+  )
+
+  const handleDragMove = useCallback(
+    (event: DragMoveEvent) => {
+      updateDragOverInfo(event.active, event.over)
+    },
+    [updateDragOverInfo]
+  )
+
+  const clearDragState = useCallback(() => {
+    setActiveId(null)
+    dragOverInfoRef.current = null
+    setDragOverInfo(null)
+  }, [])
+
+  const handleDragCancel = useCallback((_event: DragCancelEvent) => {
+    clearDragState()
+  }, [clearDragState])
+
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
-      const { active, over } = event
-      if (!over) return
+      const { active } = event
       const aid = String(active.id)
-      const oid = String(over.id)
+
+      const info = dragOverInfoRef.current
+      clearDragState()
+
+      if (!info) return
+      const { id: oid, position } = info
       if (aid === oid) return
 
       const activeDoc = byId(documents, aid)
@@ -305,31 +450,12 @@ export function BinderProvider({
       } = await supabase.auth.getUser()
       if (!user) return
 
-      const sameParent = activeDoc.parent_id === overDoc.parent_id
-
-      if (sameParent) {
-        const siblings = getChildren(documents, activeDoc.parent_id)
-        const oldIndex = siblings.findIndex((d) => d.id === aid)
-        const newIndex = siblings.findIndex((d) => d.id === oid)
-        if (oldIndex < 0 || newIndex < 0) return
-        const reordered = arrayMove(siblings, oldIndex, newIndex)
-        for (let i = 0; i < reordered.length; i++) {
-          await supabase
-            .from('write_documents')
-            .update({ order_index: i })
-            .eq('id', reordered[i].id)
-            .eq('user_id', user.id)
-        }
-        await refresh()
-        return
-      }
-
-      if (overDoc.type === 'folder' && !isDescendant(documents, oid, aid)) {
-        const childrenInFolder = getChildren(documents, oid)
+      if (position === 'into' && overDoc.type === 'folder') {
+        const children = getChildren(documents, oid)
         const nextOrder =
-          childrenInFolder.length === 0
+          children.length === 0
             ? 0
-            : Math.max(...childrenInFolder.map((c) => c.order_index)) + 1
+            : Math.max(...children.map((c) => c.order_index)) + 1
         await supabase
           .from('write_documents')
           .update({ parent_id: oid, order_index: nextOrder })
@@ -340,16 +466,25 @@ export function BinderProvider({
       }
 
       const targetParent = overDoc.parent_id
-      const newSiblings = sortByOrder(
+      const siblings = sortByOrder(
         getChildren(documents, targetParent).filter((d) => d.id !== aid)
       )
-      const overIndex = newSiblings.findIndex((d) => d.id === oid)
-      const insertIndex = overIndex < 0 ? newSiblings.length : overIndex
+      const overIndex = siblings.findIndex((d) => d.id === oid)
+      const insertIndex =
+        position === 'before'
+          ? overIndex < 0
+            ? 0
+            : overIndex
+          : overIndex < 0
+            ? siblings.length
+            : overIndex + 1
+
       const withActive: DocRow[] = [
-        ...newSiblings.slice(0, insertIndex),
+        ...siblings.slice(0, insertIndex),
         { ...activeDoc, parent_id: targetParent },
-        ...newSiblings.slice(insertIndex),
+        ...siblings.slice(insertIndex),
       ]
+
       for (let i = 0; i < withActive.length; i++) {
         await supabase
           .from('write_documents')
@@ -359,7 +494,7 @@ export function BinderProvider({
       }
       await refresh()
     },
-    [documents, refresh]
+    [clearDragState, documents, refresh]
   )
 
   const value: BinderContextValue = {
@@ -368,6 +503,8 @@ export function BinderProvider({
     labels,
     loading,
     selectedDocId,
+    activeId,
+    dragOverInfo,
     refresh,
     createDocument,
     createFolder,
@@ -377,10 +514,27 @@ export function BinderProvider({
     getLabel,
   }
 
+  const activeDoc = activeId ? byId(documents, activeId) : null
+
   return (
     <BinderContext.Provider value={value}>
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={(args) => {
+          const pw = pointerWithin(args)
+          if (pw.length > 0) return pw
+          return closestCenter(args)
+        }}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragMove={handleDragMove}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
         {children}
+        <DragOverlay dropAnimation={null}>
+          {activeDoc ? <DragPreview doc={activeDoc} /> : null}
+        </DragOverlay>
       </DndContext>
     </BinderContext.Provider>
   )
@@ -415,12 +569,14 @@ function SortableBranch({
   depth: number
 }) {
   const { documents } = useBinderContext()
-  const children = getChildren(documents, parentId)
+  const children = documents
+    .filter((d) => d.parent_id === parentId)
+    .sort((a, b) => a.order_index - b.order_index)
   const ids = children.map((c) => c.id)
   if (children.length === 0) return null
   return (
     <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-      <ul className="flex list-none flex-col gap-0.5 p-0" role="list">
+      <ul className="flex list-none flex-col gap-0 p-0" role="list">
         {children.map((doc) => (
           <li key={doc.id} className="min-w-0">
             <BinderItem

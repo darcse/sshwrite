@@ -25,6 +25,13 @@ type BinderItemProps = {
   renderNested?: (folderId: string) => ReactNode
 }
 
+const DROP_LINE_STYLE: React.CSSProperties = {
+  height: 2,
+  borderRadius: 1,
+  backgroundColor: '#007AFF',
+  marginInline: 8,
+}
+
 export function BinderItem({ doc, depth, renderNested }: BinderItemProps) {
   const {
     selectedDocId,
@@ -32,6 +39,7 @@ export function BinderItem({ doc, depth, renderNested }: BinderItemProps) {
     deleteDocument,
     getLabel,
     refresh,
+    dragOverInfo,
   } = useBinderContext()
 
   const [editing, setEditing] = useState(false)
@@ -67,12 +75,18 @@ export function BinderItem({ doc, depth, renderNested }: BinderItemProps) {
     isDragging,
   } = useSortable({ id: doc.id })
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.6 : 1,
+    opacity: isDragging ? 0.4 : 1,
     paddingLeft: depth * 12,
   }
+
+  const isDropTarget = dragOverInfo?.id === doc.id
+  const dropPosition = isDropTarget ? dragOverInfo!.position : null
+  const isDropBefore = dropPosition === 'before'
+  const isDropAfter = dropPosition === 'after'
+  const isFolderOver = dropPosition === 'into' && doc.type === 'folder'
 
   const selected = selectedDocId === doc.id
   const label = getLabel(doc.label)
@@ -85,6 +99,14 @@ export function BinderItem({ doc, depth, renderNested }: BinderItemProps) {
             ? '#34C759'
             : 'var(--muted)'))
       : undefined
+
+  const folderIconColor = isFolderOver ? '#007AFF' : '#F5A623'
+
+  const rowStyle: React.CSSProperties = isFolderOver
+    ? { backgroundColor: 'rgba(0, 122, 255, 0.1)' }
+    : selected
+      ? { backgroundColor: 'var(--badge-bg)' }
+      : {}
 
   function cancelEdit() {
     setDraft(doc.title)
@@ -138,19 +160,16 @@ export function BinderItem({ doc, depth, renderNested }: BinderItemProps) {
     }, 250)
   }
 
-  const rowBg = selected
-    ? { backgroundColor: 'var(--badge-bg)' }
-    : undefined
-
   return (
     <div ref={setNodeRef} style={style}>
+      {isDropBefore && <div style={DROP_LINE_STYLE} />}
       <div
         className={`group flex h-8 min-w-0 items-center gap-1 rounded-[6px] px-2 transition-colors ${
-          selected
+          selected && !isFolderOver
             ? ''
             : 'hover:bg-[color-mix(in_srgb,var(--badge-bg)_50%,transparent)]'
         }`}
-        style={rowBg}
+        style={rowStyle}
       >
         {doc.type === 'folder' ? (
           <button
@@ -185,7 +204,7 @@ export function BinderItem({ doc, depth, renderNested }: BinderItemProps) {
         {doc.type === 'folder' ? (
           <Folder
             className="h-4 w-4 shrink-0"
-            style={{ color: '#F5A623' }}
+            style={{ color: folderIconColor, transition: 'color 0.15s' }}
             strokeWidth={2}
             aria-hidden
           />
@@ -255,6 +274,7 @@ export function BinderItem({ doc, depth, renderNested }: BinderItemProps) {
           </button>
         </div>
       </div>
+      {isDropAfter && <div style={DROP_LINE_STYLE} />}
       {doc.type === 'folder' && renderNested && expanded ? (
         <div className="mt-0.5">{renderNested(doc.id)}</div>
       ) : null}
