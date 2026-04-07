@@ -2,7 +2,9 @@
 
 import { BinderProvider, BinderTree, useBinderContext } from '@/components/binder/BinderTree'
 import { AssistantPanel } from '@/components/assistant/AssistantPanel'
+import { Corkboard } from '@/components/corkboard/Corkboard'
 import { Editor } from '@/components/editor/Editor'
+import { PomodoroTimer } from '@/components/ui/PomodoroTimer'
 import { createClient } from '@/lib/supabase/client'
 import {
   CheckCircle2,
@@ -162,26 +164,29 @@ function BinderHeaderBar({ onCollapse }: { onCollapse: () => void }) {
 }
 
 function EditorPanel() {
-  const { documents, selectedDocId } = useBinderContext()
+  const { documents, labels, selectedDocId, updateDocument, navigateToDoc } = useBinderContext()
   const doc = selectedDocId ? documents.find((d) => d.id === selectedDocId) : undefined
   const [focusMode, setFocusMode] = useState(false)
   return (
     <>
       <div className="flex h-12 min-w-0 shrink-0 items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--card-bg)] px-3 text-sm font-medium text-[var(--foreground)]">
         <span className="min-w-0 flex-1 truncate">{doc ? doc.title : '문서를 선택하세요'}</span>
-        <button
-          type="button"
-          className="shrink-0 rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
-          onClick={() => setFocusMode((v) => !v)}
-          aria-label={focusMode ? '포커스 해제' : '포커스 모드'}
-          title={focusMode ? '포커스 해제' : '포커스 모드'}
-        >
-          {focusMode ? (
-            <Shrink className="h-5 w-5" strokeWidth={2} aria-hidden />
-          ) : (
-            <Expand className="h-5 w-5" strokeWidth={2} aria-hidden />
-          )}
-        </button>
+        <div className="flex items-center gap-1">
+          <PomodoroTimer />
+          <button
+            type="button"
+            className="shrink-0 rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
+            onClick={() => setFocusMode((v) => !v)}
+            aria-label={focusMode ? '포커스 해제' : '포커스 모드'}
+            title={focusMode ? '포커스 해제' : '포커스 모드'}
+          >
+            {focusMode ? (
+              <Shrink className="h-5 w-5" strokeWidth={2} aria-hidden />
+            ) : (
+              <Expand className="h-5 w-5" strokeWidth={2} aria-hidden />
+            )}
+          </button>
+        </div>
       </div>
       <div
         className="flex min-h-0 flex-1 flex-col overflow-hidden p-4"
@@ -192,9 +197,17 @@ function EditorPanel() {
         {!doc ? (
           <p className="text-[var(--muted)]">문서를 선택하세요</p>
         ) : doc.type === 'folder' ? (
-          <p className="text-[var(--muted)]">
-            폴더는 여기에 본문이 없습니다. 문서를 선택하세요.
-          </p>
+          <div className="min-h-0 flex-1 overflow-auto">
+            <Corkboard
+              folderId={doc.id}
+              documents={documents}
+              labels={labels}
+              onOpenDocument={navigateToDoc}
+              onSaveSynopsis={async (id, synopsis) => {
+                await updateDocument(id, { synopsis: synopsis || null })
+              }}
+            />
+          </div>
         ) : (
           <Editor
             key={doc.id}
@@ -455,7 +468,7 @@ function InspectorPanel() {
           </div>
         ) : null}
       </div>
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="mb-6 flex flex-col gap-1 text-sm">
         <span className="text-[var(--muted)]">메모</span>
         <textarea
           rows={5}

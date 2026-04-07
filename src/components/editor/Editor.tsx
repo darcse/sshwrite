@@ -347,13 +347,13 @@ export function Editor({
     >
       <style>{`.ProseMirror { outline: none !important; border: none !important; }`}</style>
       <div
-        className="min-h-0 flex-1 overflow-auto"
+        className="min-h-0 flex-1 overflow-y-auto"
         style={{
-          backgroundColor: 'var(--background)',
+          backgroundColor: 'var(--card-bg)',
           color: 'var(--foreground)',
         }}
       >
-        <div className="w-full h-full" style={{ 
+        <div className="min-h-full w-full" style={{ 
   paddingLeft: 0, 
   paddingRight: 0,
   backgroundColor: 'var(--card-bg)',
@@ -413,7 +413,7 @@ export function Editor({
       {inspectorMount
         ? createPortal(
             <div
-              className="mb-4 border-b pb-4"
+              className="mb-8 border-b pb-4"
               style={{ borderColor: 'var(--border)' }}
             >
               <label className="flex flex-col gap-1.5 text-sm">
