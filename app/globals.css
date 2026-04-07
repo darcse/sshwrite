@@ -1,26 +1,79 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* =============================================
+   Design System: Ink & Glass / Manuscript Pro
+   ============================================= */
+
+@theme {
+  --color-bg: #F9F9F9;
+  --color-surface: #FFFFFF;
+  --color-border: #E5E7EB;
+  --color-text-primary: #111827;
+  --color-text-secondary: #4B5563;
+  --color-accent: #5E5CE6;
+  --color-accent-hover: #4B4ACF;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+
+  --font-ui: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-writing: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Light Mode */
+    --bg-color: #F9F9F9;
+    --surface-color: #FFFFFF;
+    --border-color: #E5E7EB;
+    --text-primary: #111827;
+    --text-secondary: #4B5563;
+    --accent-color: #5E5CE6;
+    --accent-hover: #4B4ACF;
+  }
+
+  .dark-mode {
+    --bg-color: #0E0E0E;
+    --surface-color: #1E1E1E;
+    --border-color: #2D2D2D;
+    --text-primary: #E5E7EB;
+    --text-secondary: #9CA3AF;
+  }
+
+  body {
+    font-family: var(--font-ui);
+    background-color: var(--bg-color);
+    color: var(--text-primary);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  .font-ui {
+    font-family: var(--font-ui);
+  }
+
+  .font-writing {
+    font-family: var(--font-writing);
+    line-height: 1.6;
+  }
+
+  .card {
+    background-color: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+  }
+
+  .btn-primary {
+    background-color: var(--accent-color);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+    transition: background-color 0.2s;
+  }
+
+  .btn-primary:hover {
+    background-color: var(--accent-hover);
+  }
 }
