@@ -1,79 +1,222 @@
 @import "tailwindcss";
 
-/* =============================================
-   Design System: Ink & Glass / Manuscript Pro
-   ============================================= */
-
-@theme {
-  --color-bg: #F9F9F9;
-  --color-surface: #FFFFFF;
-  --color-border: #E5E7EB;
-  --color-text-primary: #111827;
-  --color-text-secondary: #4B5563;
-  --color-accent: #5E5CE6;
-  --color-accent-hover: #4B4ACF;
-
-  --radius-sm: 4px;
-  --radius-md: 8px;
-
-  --font-ui: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-writing: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+:root {
+  --background: #fbfbfd;
+  --foreground: #1d1d1f;
+  --muted: #6e6e73;
+  --border: rgba(0, 0, 0, 0.06);
+  --card-bg: #ffffff;
+  --shadow: 0 20px 40px rgba(46, 50, 61, 0.06);
+  --radius: 12px;
+  --radius-lg: 24px;
+  --badge-bg: rgba(0, 0, 0, 0.06);
+  --link: #005bc1;
+  --accent: #5E5CE6;
+  --accent-hover: #4B4ACF;
 }
 
-@layer base {
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
   :root {
-    /* Light Mode */
-    --bg-color: #F9F9F9;
-    --surface-color: #FFFFFF;
-    --border-color: #E5E7EB;
-    --text-primary: #111827;
-    --text-secondary: #4B5563;
-    --accent-color: #5E5CE6;
-    --accent-hover: #4B4ACF;
+    --background: #000000;
+    --foreground: #f5f5f7;
+    --muted: #a1a1a6;
+    --border: rgba(255, 255, 255, 0.1);
+    --card-bg: #1c1c1e;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    --badge-bg: rgba(255, 255, 255, 0.12);
+    --link: #2997ff;
+    --accent: #7B79F7;
+    --accent-hover: #6B69E8;
   }
+}
 
-  .dark-mode {
-    --bg-color: #0E0E0E;
-    --surface-color: #1E1E1E;
-    --border-color: #2D2D2D;
-    --text-primary: #E5E7EB;
-    --text-secondary: #9CA3AF;
-  }
+:root.theme-light {
+  --background: #fbfbfd;
+  --foreground: #1d1d1f;
+  --muted: #6e6e73;
+  --border: rgba(0, 0, 0, 0.06);
+  --card-bg: #ffffff;
+  --shadow: 0 20px 40px rgba(46, 50, 61, 0.06);
+  --badge-bg: rgba(0, 0, 0, 0.06);
+  --link: #005bc1;
+  --accent: #5E5CE6;
+  --accent-hover: #4B4ACF;
+}
 
-  body {
-    font-family: var(--font-ui);
-    background-color: var(--bg-color);
-    color: var(--text-primary);
+:root.theme-dark {
+  --background: #000000;
+  --foreground: #f5f5f7;
+  --muted: #a1a1a6;
+  --border: rgba(255, 255, 255, 0.1);
+  --card-bg: #1c1c1e;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  --badge-bg: rgba(255, 255, 255, 0.12);
+  --link: #2997ff;
+  --accent: #7B79F7;
+  --accent-hover: #6B69E8;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 2px;
+}
+
+.card-apple {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.btn-apple {
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+}
+.btn-apple:active {
+  transform: scale(0.98);
+}
+.btn-apple-primary {
+  background: var(--foreground);
+  color: var(--background);
+  border: none;
+}
+.btn-apple-primary:hover {
+  opacity: 0.88;
+}
+.btn-apple-secondary {
+  background: var(--card-bg);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+}
+.btn-apple-secondary:hover {
+  opacity: 0.88;
+}
+.btn-apple-danger {
+  background: rgba(255, 59, 48, 0.12);
+  color: #ff3b30;
+  border: none;
+}
+.btn-apple-danger:hover {
+  opacity: 0.88;
+}
+@media (prefers-color-scheme: dark) {
+  .btn-apple-danger {
+    background: rgba(255, 69, 58, 0.2);
+    color: #ff453a;
   }
+}
+
+.btn-accent {
+  background: var(--accent);
+  color: #ffffff;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: background-color 0.2s ease, transform 0.15s ease;
+}
+.btn-accent:hover {
+  background: var(--accent-hover);
+}
+.btn-accent:active {
+  transform: scale(0.98);
+}
+
+.input-apple,
+.select-apple {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--foreground);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.input-apple:focus,
+.select-apple:focus {
+  outline: none;
+  border-color: var(--foreground);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
+}
+@media (prefers-color-scheme: dark) {
+  .input-apple:focus,
+  .select-apple:focus {
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+  }
+}
+
+.badge-apple {
+  background: var(--badge-bg);
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.section-title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+}
+
+.page-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+}
+
+.modal-overlay-apple {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+}
+.modal-panel-apple {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  .modal-panel-apple {
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+  }
+}
+
+.empty-state-apple {
+  background: var(--card-bg);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--muted);
+  font-weight: 500;
 }
 
 @layer utilities {
-  .font-ui {
-    font-family: var(--font-ui);
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 
   .font-writing {
-    font-family: var(--font-writing);
-    line-height: 1.6;
-  }
-
-  .card {
-    background-color: var(--surface-color);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    padding: 1rem;
-  }
-
-  .btn-primary {
-    background-color: var(--accent-color);
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: var(--radius-sm);
-    font-weight: 500;
-    transition: background-color 0.2s;
-  }
-
-  .btn-primary:hover {
-    background-color: var(--accent-hover);
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.8;
+    letter-spacing: 0;
   }
 }
