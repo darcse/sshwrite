@@ -82,10 +82,12 @@ function HeaderBar() {
 
   return (
     <header className="border-b border-[var(--border)] bg-[var(--background)]">
-      <div className="mx-auto flex h-12 w-full max-w-6xl items-center justify-between px-4">
+      <div className="relative flex h-12 w-full items-center justify-end pr-4">
         <Link
           href="/"
+          className="absolute top-1/2 -translate-y-1/2"
           style={{
+            left: 16,
             fontWeight: 700,
             fontSize: '16px',
             color: 'var(--foreground)',

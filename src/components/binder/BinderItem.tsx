@@ -2,9 +2,16 @@
 
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import type { DocRow, LabelRow } from '@/components/binder/BinderTree'
+import type { DocRow } from '@/components/binder/BinderTree'
 import { useBinderContext } from '@/components/binder/BinderTree'
 import { createClient } from '@/lib/supabase/client'
+import {
+  ChevronDown,
+  ChevronRight,
+  File,
+  Folder,
+  Trash2,
+} from 'lucide-react'
 import {
   useEffect,
   useRef,
@@ -30,6 +37,7 @@ export function BinderItem({ doc, depth, renderNested }: BinderItemProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(doc.title)
   const [saving, setSaving] = useState(false)
+  const [expanded, setExpanded] = useState(true)
   const inputRef = useRef<HTMLInputElement>(null)
   const navigateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -68,6 +76,15 @@ export function BinderItem({ doc, depth, renderNested }: BinderItemProps) {
 
   const selected = selectedDocId === doc.id
   const label = getLabel(doc.label)
+  const documentFileColor =
+    doc.type === 'document'
+      ? (label?.color ??
+        (doc.status === 'writing'
+          ? '#007AFF'
+          : doc.status === 'done'
+            ? '#34C759'
+            : 'var(--muted)'))
+      : undefined
 
   function cancelEdit() {
     setDraft(doc.title)
@@ -121,21 +138,44 @@ export function BinderItem({ doc, depth, renderNested }: BinderItemProps) {
     }, 250)
   }
 
+  const rowBg = selected
+    ? { backgroundColor: 'var(--badge-bg)' }
+    : undefined
+
   return (
     <div ref={setNodeRef} style={style}>
       <div
-        className="group flex min-w-0 items-center gap-1 rounded border px-1 py-1"
-        style={{
-          borderColor: selected ? 'var(--accent-color)' : 'transparent',
-          backgroundColor: selected
-            ? 'color-mix(in srgb, var(--accent-color) 12%, transparent)'
-            : 'transparent',
-        }}
+        className={`group flex h-8 min-w-0 items-center gap-1 rounded-[6px] px-2 transition-colors ${
+          selected
+            ? ''
+            : 'hover:bg-[color-mix(in_srgb,var(--badge-bg)_50%,transparent)]'
+        }`}
+        style={rowBg}
       >
+        {doc.type === 'folder' ? (
+          <button
+            type="button"
+            className="flex h-8 w-4 shrink-0 items-center justify-center text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
+            onClick={(e) => {
+              e.stopPropagation()
+              setExpanded((v) => !v)
+            }}
+            aria-expanded={expanded}
+            aria-label={expanded ? '폴더 접기' : '폴더 펼치기'}
+          >
+            {expanded ? (
+              <ChevronDown className="h-2 w-2" strokeWidth={2} aria-hidden />
+            ) : (
+              <ChevronRight className="h-2 w-2" strokeWidth={2} aria-hidden />
+            )}
+          </button>
+        ) : (
+          <span className="inline-block w-4 shrink-0" aria-hidden />
+        )}
         <button
           type="button"
-          className="cursor-grab touch-none px-0.5 text-xs leading-none"
-          style={{ color: 'var(--text-secondary)' }}
+          className="cursor-grab touch-none shrink-0 px-0.5 text-xs leading-none opacity-0 transition-opacity group-hover:opacity-100"
+          style={{ color: 'var(--muted)' }}
           aria-label="순서 변경"
           {...attributes}
           {...listeners}
@@ -143,21 +183,30 @@ export function BinderItem({ doc, depth, renderNested }: BinderItemProps) {
           ⋮⋮
         </button>
         {doc.type === 'folder' ? (
-          <span className="shrink-0 text-xs" aria-hidden>
-            📁
-          </span>
+          <Folder
+            className="h-4 w-4 shrink-0"
+            style={{ color: '#F5A623' }}
+            strokeWidth={2}
+            aria-hidden
+          />
         ) : (
-          <LabelDot label={label} status={doc.status} />
+          <File
+            className="h-4 w-4 shrink-0"
+            style={{ color: documentFileColor }}
+            strokeWidth={2}
+            aria-hidden
+          />
         )}
         {editing ? (
           <input
             ref={inputRef}
             type="text"
-            className="min-w-0 flex-1 rounded border px-1 py-0.5 text-sm"
+            className="min-h-0 min-w-0 flex-1 rounded border px-1 py-0 text-sm leading-none"
             style={{
-              borderColor: 'var(--border-color)',
-              backgroundColor: 'var(--surface-color)',
-              color: 'var(--text-primary)',
+              height: 24,
+              borderColor: 'var(--border)',
+              backgroundColor: 'var(--card-bg)',
+              color: 'var(--foreground)',
             }}
             value={draft}
             disabled={saving}
@@ -177,8 +226,7 @@ export function BinderItem({ doc, depth, renderNested }: BinderItemProps) {
         ) : (
           <button
             type="button"
-            className="min-w-0 flex-1 truncate text-left text-sm"
-            style={{ color: 'var(--text-primary)' }}
+            className="min-w-0 flex-1 truncate text-left text-sm text-[var(--foreground)]"
             onClick={scheduleNavigate}
             onDoubleClick={(e) => {
               e.preventDefault()
@@ -193,58 +241,23 @@ export function BinderItem({ doc, depth, renderNested }: BinderItemProps) {
             {doc.title}
           </button>
         )}
-        <div className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        <div className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
           <button
             type="button"
-            className="rounded px-1.5 py-0.5 text-xs"
-            style={{
-              borderWidth: 1,
-              borderStyle: 'solid',
-              borderColor: 'var(--border-color)',
-              color: 'var(--text-secondary)',
-              backgroundColor: 'var(--surface-color)',
-            }}
+            className="rounded p-0.5 text-[var(--muted)] transition-colors hover:text-[#ff3b30]"
+            aria-label="삭제"
             onClick={(e) => {
               e.stopPropagation()
               deleteDocument(doc.id)
             }}
           >
-            삭제
+            <Trash2 className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
           </button>
         </div>
       </div>
-      {doc.type === 'folder' && renderNested ? (
-        <div className="mt-0.5 border-l pl-1" style={{ borderColor: 'var(--border-color)' }}>
-          {renderNested(doc.id)}
-        </div>
+      {doc.type === 'folder' && renderNested && expanded ? (
+        <div className="mt-0.5">{renderNested(doc.id)}</div>
       ) : null}
     </div>
-  )
-}
-
-function LabelDot({
-  label,
-  status,
-}: {
-  label: LabelRow | undefined
-  status: string
-}) {
-  const bg = label?.color ?? 'var(--border-color)'
-  return (
-    <span
-      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border"
-      style={{
-        backgroundColor: bg,
-        borderColor: 'var(--border-color)',
-        boxShadow:
-          status === 'done'
-            ? '0 0 0 1px var(--accent-color)'
-            : status === 'writing'
-              ? '0 0 0 1px #f59e0b'
-              : undefined,
-      }}
-      title={label?.name ?? '라벨 없음'}
-      aria-hidden
-    />
   )
 }

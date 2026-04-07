@@ -2,6 +2,7 @@
 
 import { BinderProvider, BinderTree, useBinderContext } from '@/components/binder/BinderTree'
 import { Editor } from '@/components/editor/Editor'
+import { FilePlus, FolderPlus } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -26,7 +27,16 @@ const DEFAULT_INSPECTOR = 280
 const MIN_PANEL = 160
 const MIN_EDITOR = 200
 const SPLITTER_PX = 6
-const COLLAPSE_RAIL_PX = 40
+const COLLAPSE_RAIL_PX = 28
+
+function BinderPanelToggleIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect x="2" y="2" width="4" height="12" rx="1" fill="currentColor" opacity="0.3" />
+      <rect x="8" y="2" width="6" height="12" rx="1" fill="currentColor" />
+    </svg>
+  )
+}
 
 function loadStored(projectId: string): StoredLayout | null {
   if (typeof window === 'undefined') return null
@@ -67,32 +77,77 @@ function clampInspector(next: number, containerW: number, binderW: number) {
   return Math.min(Math.max(MIN_PANEL, next), Math.max(MIN_PANEL, max))
 }
 
+function BinderHeaderBar({ onCollapse }: { onCollapse: () => void }) {
+  const { createDocument, createFolder, loading } = useBinderContext()
+  const [pending, setPending] = useState(false)
+  const busy = loading || pending
+
+  async function run(fn: () => Promise<void>) {
+    setPending(true)
+    try {
+      await fn()
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--card-bg)] px-2">
+      <span className="text-sm font-medium text-[var(--foreground)]">바인더</span>
+      <div className="flex items-center gap-0.5">
+        <button
+          type="button"
+          onClick={() => run(createDocument)}
+          disabled={busy}
+          className="rounded-md p-1.5 text-[var(--muted)] transition-colors hover:text-[var(--foreground)] disabled:opacity-50"
+          title="새 문서"
+        >
+          <FilePlus className="h-4 w-4" strokeWidth={2} aria-hidden />
+        </button>
+        <button
+          type="button"
+          onClick={() => run(createFolder)}
+          disabled={busy}
+          className="rounded-md p-1.5 text-[var(--muted)] transition-colors hover:text-[var(--foreground)] disabled:opacity-50"
+          title="새 폴더"
+        >
+          <FolderPlus className="h-4 w-4" strokeWidth={2} aria-hidden />
+        </button>
+        <button
+          type="button"
+          onClick={onCollapse}
+          className="rounded-md p-1.5 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
+          aria-expanded
+          aria-controls="binder-panel"
+          title="바인더 접기"
+        >
+          <BinderPanelToggleIcon />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function EditorPanel() {
   const { documents, selectedDocId } = useBinderContext()
   const doc = selectedDocId ? documents.find((d) => d.id === selectedDocId) : undefined
   return (
     <>
-      <div
-        className="shrink-0 border-b px-3 py-2 text-sm font-medium"
-        style={{
-          borderColor: 'var(--border-color)',
-          backgroundColor: 'var(--surface-color)',
-          color: 'var(--text-primary)',
-        }}
-      >
-        {doc ? doc.title : '문서를 선택하세요'}
+      <div className="flex h-12 min-w-0 shrink-0 items-center border-b border-[var(--border)] bg-[var(--card-bg)] px-3 text-sm font-medium text-[var(--foreground)]">
+        <span className="truncate">{doc ? doc.title : '문서를 선택하세요'}</span>
       </div>
       <div
         className="flex min-h-0 flex-1 flex-col overflow-hidden p-4"
         style={{
-          backgroundColor: 'var(--surface-color)',
-          color: 'var(--text-secondary)',
+          backgroundColor: 'var(--card-bg)',
         }}
       >
         {!doc ? (
-          <p>문서를 선택하세요</p>
+          <p className="text-[var(--muted)]">문서를 선택하세요</p>
         ) : doc.type === 'folder' ? (
-          <p>폴더는 여기에 본문이 없습니다. 문서를 선택하세요.</p>
+          <p className="text-[var(--muted)]">
+            폴더는 여기에 본문이 없습니다. 문서를 선택하세요.
+          </p>
         ) : (
           <Editor
             key={doc.id}
@@ -119,12 +174,12 @@ function InspectorPanel() {
   }
 
   if (loading) {
-    return <p style={{ color: 'var(--text-secondary)' }}>불러오는 중…</p>
+    return <p className="text-[var(--muted)]">불러오는 중…</p>
   }
 
   if (!doc || doc.type !== 'document') {
     return (
-      <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+      <p className="text-sm text-[var(--muted)]">
         문서를 선택하면 라벨과 상태를 편집할 수 있습니다.
       </p>
     )
@@ -133,17 +188,12 @@ function InspectorPanel() {
   return (
     <div className="flex flex-col gap-4">
       <label className="flex flex-col gap-1 text-sm">
-        <span style={{ color: 'var(--text-secondary)' }}>상태</span>
+        <span className="text-[var(--muted)]">상태</span>
         <select
           value={doc.status}
           disabled={saving}
           onChange={(e) => patch({ status: e.target.value })}
-          className="rounded border px-2 py-1.5"
-          style={{
-            borderColor: 'var(--border-color)',
-            backgroundColor: 'var(--bg-color)',
-            color: 'var(--text-primary)',
-          }}
+          className="rounded border border-[var(--border)] bg-[var(--card-bg)] px-2 py-1.5 text-[var(--foreground)]"
         >
           <option value="todo">할 일</option>
           <option value="writing">작성 중</option>
@@ -151,19 +201,14 @@ function InspectorPanel() {
         </select>
       </label>
       <label className="flex flex-col gap-1 text-sm">
-        <span style={{ color: 'var(--text-secondary)' }}>라벨</span>
+        <span className="text-[var(--muted)]">라벨</span>
         <select
           value={doc.label ?? ''}
           disabled={saving}
           onChange={(e) =>
             patch({ label: e.target.value ? e.target.value : null })
           }
-          className="rounded border px-2 py-1.5"
-          style={{
-            borderColor: 'var(--border-color)',
-            backgroundColor: 'var(--bg-color)',
-            color: 'var(--text-primary)',
-          }}
+          className="rounded border border-[var(--border)] bg-[var(--card-bg)] px-2 py-1.5 text-[var(--foreground)]"
         >
           <option value="">없음</option>
           {labels.map((l) => (
@@ -173,11 +218,7 @@ function InspectorPanel() {
           ))}
         </select>
       </label>
-      {saving ? (
-        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-          저장 중…
-        </p>
-      ) : null}
+      {saving ? <p className="text-xs text-[var(--muted)]">저장 중…</p> : null}
     </div>
   )
 }
@@ -333,67 +374,47 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
 
   return (
     <BinderProvider projectId={projectId}>
-      <div
-        ref={containerRef}
-        className="flex min-h-0 w-full flex-1 flex-col border-t md:h-[calc(100dvh-3.5rem)] md:flex-row md:overflow-hidden"
-        style={{
-          borderColor: 'var(--border-color)',
-          backgroundColor: 'var(--bg-color)',
-        }}
-      >
         <div
-          className="flex min-h-0 shrink-0 flex-col border-b md:h-full md:border-b-0 md:border-r"
-          style={{
-            ...binderColumnStyle,
-            borderColor: 'var(--border-color)',
-          }}
+          ref={containerRef}
+          className="flex min-h-0 w-full flex-1 flex-col border-t border-[var(--border)] bg-[var(--background)] md:h-[calc(100dvh-3.5rem)] md:flex-row md:overflow-hidden"
+        >
+        <div
+          className="flex min-h-0 shrink-0 flex-col border-b border-[var(--border)] bg-[var(--card-bg)] transition-[width] duration-200 ease-out md:h-full md:border-b-0 md:border-r"
+          style={binderColumnStyle}
           data-panel="binder"
         >
-          {binderCollapsed ? (
-            <div className="flex h-full min-h-[2.5rem] flex-row items-stretch md:min-h-0 md:w-full md:flex-col">
+          {desktop && binderCollapsed ? (
+            <div className="flex w-full flex-col items-stretch">
               <button
                 type="button"
                 onClick={toggleBinder}
-                className="flex flex-1 items-center justify-center border-r text-sm md:w-full md:flex-1 md:border-r-0 md:border-b"
-                style={{
-                  borderColor: 'var(--border-color)',
-                  backgroundColor: 'var(--surface-color)',
-                  color: 'var(--text-secondary)',
-                }}
+                className="sticky top-0 z-10 flex h-12 w-7 shrink-0 items-center justify-center border-r border-[var(--border)] bg-[var(--card-bg)] text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
                 aria-expanded={false}
                 aria-controls="binder-panel"
                 title="바인더 펼치기"
               >
-                ▸
+                <BinderPanelToggleIcon />
+              </button>
+            </div>
+          ) : binderCollapsed && !desktop ? (
+            <div className="flex h-full min-h-[2.5rem] w-full flex-row items-stretch">
+              <button
+                type="button"
+                onClick={toggleBinder}
+                className="flex flex-1 items-center justify-center border-r border-[var(--border)] bg-[var(--card-bg)] text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
+                aria-expanded={false}
+                aria-controls="binder-panel"
+                title="바인더 펼치기"
+              >
+                <BinderPanelToggleIcon />
               </button>
             </div>
           ) : (
-            <div id="binder-panel" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-              <div
-                className="flex shrink-0 items-center justify-between gap-2 border-b px-2 py-2"
-                style={{
-                  borderColor: 'var(--border-color)',
-                  backgroundColor: 'var(--surface-color)',
-                }}
-              >
-                <span
-                  className="text-sm font-medium"
-                  style={{ color: 'var(--text-primary)' }}
-                >
-                  바인더
-                </span>
-                <button
-                  type="button"
-                  onClick={toggleBinder}
-                  className="rounded px-2 py-1 text-sm"
-                  style={{ color: 'var(--text-secondary)' }}
-                  aria-expanded
-                  aria-controls="binder-panel"
-                  title="바인더 접기"
-                >
-                  ◂
-                </button>
-              </div>
+            <div
+              id="binder-panel"
+              className="flex min-h-0 flex-1 flex-col overflow-hidden"
+            >
+              <BinderHeaderBar onCollapse={toggleBinder} />
               <BinderTree />
             </div>
           )}
@@ -409,14 +430,13 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
           }
           style={{
             width: SPLITTER_PX,
-            backgroundColor: 'var(--border-color)',
+            backgroundColor: 'var(--border)',
           }}
           onMouseDown={startDragBinder}
         />
 
         <main
-          className="flex min-h-[40vh] min-w-0 flex-1 flex-col overflow-hidden border-b md:min-h-0 md:border-b-0"
-          style={{ borderColor: 'var(--border-color)' }}
+          className="flex min-h-[40vh] min-w-0 flex-1 flex-col overflow-hidden border-b border-[var(--border)] md:min-h-0 md:border-b-0"
           data-panel="editor"
         >
           <EditorPanel />
@@ -428,33 +448,23 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
           className="hidden shrink-0 cursor-col-resize md:block"
           style={{
             width: SPLITTER_PX,
-            backgroundColor: 'var(--border-color)',
+            backgroundColor: 'var(--border)',
           }}
           onMouseDown={startDragInspector}
         />
 
         <aside
-          className="flex min-h-0 shrink-0 flex-col border-t md:h-full md:border-t-0 md:border-l"
+          className="flex min-h-0 shrink-0 flex-col border-t border-[var(--border)] bg-[var(--card-bg)] md:h-full md:border-t-0 md:border-l"
           style={{
             ...inspectorStyle,
-            borderColor: 'var(--border-color)',
-            backgroundColor: 'var(--surface-color)',
+            borderColor: 'var(--border)',
           }}
           data-panel="inspector"
         >
-          <div
-            className="shrink-0 border-b px-3 py-2 text-sm font-medium"
-            style={{
-              borderColor: 'var(--border-color)',
-              color: 'var(--text-primary)',
-            }}
-          >
+          <div className="flex h-12 shrink-0 items-center border-b border-[var(--border)] px-3 text-sm font-medium text-[var(--foreground)]">
             인스펙터
           </div>
-          <div
-            className="min-h-0 flex-1 overflow-auto p-3 text-sm"
-            style={{ color: 'var(--text-secondary)' }}
-          >
+          <div className="min-h-0 flex-1 overflow-auto p-3 text-sm text-[var(--muted)]">
             <InspectorPanel />
           </div>
         </aside>
@@ -477,10 +487,7 @@ export default function ProjectPage() {
   return (
     <Suspense
       fallback={
-        <div
-          className="flex flex-1 items-center justify-center p-8 text-sm"
-          style={{ color: 'var(--text-secondary)' }}
-        >
+        <div className="flex flex-1 items-center justify-center p-8 text-sm text-[var(--muted)]">
           불러오는 중…
         </div>
       }

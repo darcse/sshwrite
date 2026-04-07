@@ -387,56 +387,17 @@ export function BinderProvider({
 }
 
 export function BinderTree() {
-  const { loading, documents, createDocument, createFolder } = useBinderContext()
-  const [pending, setPending] = useState(false)
+  const { loading, documents } = useBinderContext()
   const hasAny = documents.length > 0
-  const busy = loading || pending
-
-  async function run(fn: () => Promise<void>) {
-    setPending(true)
-    try {
-      await fn()
-    } finally {
-      setPending(false)
-    }
-  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div
-        className="flex shrink-0 flex-wrap gap-2 border-b px-2 py-2"
-        style={{ borderColor: 'var(--border-color)' }}
-      >
-        <button
-          type="button"
-          onClick={() => run(createDocument)}
-          className="btn-primary rounded px-2 py-1 text-xs font-medium disabled:opacity-50"
-          disabled={busy}
-        >
-          {busy ? '처리 중…' : '+ 문서'}
-        </button>
-        <button
-          type="button"
-          onClick={() => run(createFolder)}
-          className="rounded px-2 py-1 text-xs font-medium disabled:opacity-50"
-          style={{
-            borderWidth: 1,
-            borderStyle: 'solid',
-            borderColor: 'var(--border-color)',
-            color: 'var(--text-primary)',
-            backgroundColor: 'var(--surface-color)',
-          }}
-          disabled={busy}
-        >
-          {busy ? '처리 중…' : '+ 폴더'}
-        </button>
-      </div>
       <div className="min-h-0 flex-1 overflow-auto p-2 text-sm">
         {loading ? (
-          <p style={{ color: 'var(--text-secondary)' }}>불러오는 중…</p>
+          <p className="text-[var(--muted)]">불러오는 중…</p>
         ) : !hasAny ? (
-          <p style={{ color: 'var(--text-secondary)' }}>
-            문서가 없습니다. 상단에서 문서나 폴더를 추가해 보세요.
+          <p className="text-[var(--muted)]">
+            문서가 없습니다. 바인더 헤더에서 문서나 폴더를 추가해 보세요.
           </p>
         ) : (
           <SortableBranch parentId={null} depth={0} />

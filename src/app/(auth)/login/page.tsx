@@ -2,7 +2,6 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { Eye, EyeOff } from 'lucide-react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, type FormEvent } from 'react'
 
@@ -104,14 +103,6 @@ export default function LoginPage() {
             {loginLoading ? '처리 중…' : '로그인'}
           </button>
         </form>
-        <p className="mt-8 text-center text-sm">
-          <Link
-            href="/signup"
-            className="font-semibold text-[var(--link)] underline-offset-2 hover:underline"
-          >
-            회원가입
-          </Link>
-        </p>
       </div>
     </main>
   )
