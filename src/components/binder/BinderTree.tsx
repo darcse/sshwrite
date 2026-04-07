@@ -20,6 +20,7 @@ import {
 } from '@dnd-kit/sortable'
 import { createClient } from '@/lib/supabase/client'
 import { BinderItem } from '@/components/binder/BinderItem'
+import { CharacterPanel } from '@/components/binder/CharacterPanel'
 import {
   createContext,
   useCallback,
@@ -74,6 +75,7 @@ type BinderContextValue = {
   updateDocument: (id: string, patch: Partial<DocRow>) => Promise<void>
   navigateToDoc: (id: string | null) => void
   getLabel: (labelId: string | null) => LabelRow | undefined
+  uploadCharacterImage: (file: File) => Promise<string | null>
 }
 
 const BinderContext = createContext<BinderContextValue | null>(null)
@@ -166,9 +168,11 @@ function DragPreview({ doc }: { doc: DocRow }) {
 
 export function BinderProvider({
   projectId,
+  uploadCharacterImage,
   children,
 }: {
   projectId: string
+  uploadCharacterImage: (file: File) => Promise<string | null>
   children: ReactNode
 }) {
   const router = useRouter()
@@ -512,6 +516,7 @@ export function BinderProvider({
     updateDocument,
     navigateToDoc,
     getLabel,
+    uploadCharacterImage,
   }
 
   const activeDoc = activeId ? byId(documents, activeId) : null
@@ -547,6 +552,7 @@ export function BinderTree() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-auto p-2 text-sm">
+        <CharacterPanel />
         {loading ? (
           <p className="text-[var(--muted)]">불러오는 중…</p>
         ) : !hasAny ? (

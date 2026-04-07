@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import type { ProjectModalProject } from '@/components/ui/ProjectModal'
+import { Pencil, Trash2 } from 'lucide-react'
 
 type ProjectCardProps = {
   project: ProjectModalProject
@@ -23,34 +24,47 @@ function formatUpdatedAt(iso: string | null | undefined) {
 
 export function ProjectCard({ project, deleting, onEdit, onDelete }: ProjectCardProps) {
   const coverColor = project.cover_color?.trim()
+  const coverImage = (project as ProjectModalProject & { place_image_url?: string | null }).place_image_url
   const updatedLabel = formatUpdatedAt(project.updated_at)
-  const onCover = Boolean(coverColor)
+  const onCover = Boolean(coverColor || coverImage)
 
   return (
     <article className="group card-apple relative overflow-hidden">
       <div className="relative">
         <Link href={`/projects/${project.id}`} className="block">
           <div className="relative min-h-[132px] overflow-hidden px-4 pb-12 pt-5">
+            {coverImage ? (
+              <div className="absolute inset-0 z-0">
+                <img src={coverImage} alt="" className="h-full w-full object-cover" />
+              </div>
+            ) : (
+              <div
+                className={
+                  onCover
+                    ? 'absolute inset-0 z-0'
+                    : 'absolute inset-0 z-0 bg-gradient-to-b from-[var(--badge-bg)] to-[var(--card-bg)]'
+                }
+                style={
+                  onCover
+                    ? {
+                        background: `linear-gradient(165deg, ${coverColor} 0%, ${coverColor} 52%, rgba(0,0,0,0.18) 100%)`,
+                      }
+                    : undefined
+                }
+              />
+            )}
+            {coverImage ? (
+              <div
+                className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-black/60 via-black/20 to-transparent"
+                aria-hidden
+              />
+            ) : null}
             <div
-              className={
-                onCover
-                  ? 'absolute inset-0 z-0'
-                  : 'absolute inset-0 z-0 bg-gradient-to-b from-[var(--badge-bg)] to-[var(--card-bg)]'
-              }
-              style={
-                onCover
-                  ? {
-                      background: `linear-gradient(165deg, ${coverColor} 0%, ${coverColor} 52%, rgba(0,0,0,0.18) 100%)`,
-                    }
-                  : undefined
-              }
-            />
-            <div
-              className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-14 bg-gradient-to-t from-[var(--card-bg)] via-[var(--card-bg)]/70 to-transparent"
+              className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-14 bg-gradient-to-t from-[var(--card-bg)] via-[var(--card-bg)]/70 to-transparent"
               aria-hidden
             />
             <h2
-              className={`relative z-[2] line-clamp-4 text-[20px] font-bold leading-snug ${
+              className={`relative z-[3] line-clamp-4 text-[20px] font-bold leading-snug ${
                 onCover ? 'text-white drop-shadow-sm' : 'text-[var(--foreground)]'
               }`}
             >
@@ -75,9 +89,10 @@ export function ProjectCard({ project, deleting, onEdit, onDelete }: ProjectCard
               onEdit()
             }}
             disabled={deleting}
-            className="btn-apple btn-apple-secondary px-2 py-1 text-xs font-semibold disabled:opacity-50"
+            className="rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)] disabled:opacity-50"
+            aria-label="수정"
           >
-            수정
+            <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden />
           </button>
           <button
             type="button"
@@ -87,9 +102,10 @@ export function ProjectCard({ project, deleting, onEdit, onDelete }: ProjectCard
               onDelete()
             }}
             disabled={deleting}
-            className="btn-apple btn-apple-danger px-2 py-1 text-xs font-semibold disabled:opacity-50"
+            className="rounded p-1 text-[var(--muted)] transition-colors hover:text-[#ff3b30] disabled:opacity-50"
+            aria-label={deleting ? '삭제 중' : '삭제'}
           >
-            {deleting ? '삭제 중…' : '삭제'}
+            <Trash2 className="h-4 w-4" strokeWidth={2} aria-hidden />
           </button>
         </div>
       </div>

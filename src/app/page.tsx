@@ -5,8 +5,12 @@ import { ProjectModal, type ProjectModalProject } from '@/components/ui/ProjectM
 import { createClient } from '@/lib/supabase/client'
 import { useCallback, useEffect, useState } from 'react'
 
+type DashboardProject = ProjectModalProject & {
+  place_image_url?: string | null
+}
+
 export default function DashboardPage() {
-  const [projects, setProjects] = useState<ProjectModalProject[]>([])
+  const [projects, setProjects] = useState<DashboardProject[]>([])
   const [listLoading, setListLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
@@ -35,7 +39,33 @@ export default function DashboardPage() {
       setProjects([])
       return
     }
-    setProjects((data ?? []) as ProjectModalProject[])
+    const base = (data ?? []) as DashboardProject[]
+    if (base.length === 0) {
+      setProjects([])
+      return
+    }
+    const projectIds = base.map((p) => p.id)
+    const { data: placeRows } = await supabase
+      .from('write_characters')
+      .select('project_id, image_url, order_index')
+      .eq('user_id', user.id)
+      .eq('type', 'place')
+      .in('project_id', projectIds)
+      .not('image_url', 'is', null)
+      .order('order_index', { ascending: true })
+    const firstImageByProject = new Map<string, string>()
+    ;(placeRows ?? []).forEach((row) => {
+      const projectId = (row as { project_id?: string }).project_id
+      const imageUrl = (row as { image_url?: string | null }).image_url
+      if (!projectId || !imageUrl || firstImageByProject.has(projectId)) return
+      firstImageByProject.set(projectId, imageUrl)
+    })
+    setProjects(
+      base.map((p) => ({
+        ...p,
+        place_image_url: firstImageByProject.get(p.id) ?? null,
+      }))
+    )
   }, [])
 
   useEffect(() => {

@@ -52,6 +52,29 @@ const LABEL_COLORS = [
   '#ff2d55',
 ]
 
+async function uploadWriteAssetToStorage(
+  file: File,
+  projectId: string
+): Promise<string | null> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return null
+  const parts = file.name.split('.')
+  const last = parts[parts.length - 1]
+  const ext =
+    parts.length > 1 && last && /^[a-zA-Z0-9]+$/.test(last) ? last : 'jpg'
+  const path = `${projectId}/${user.id}/${crypto.randomUUID()}.${ext}`
+  const { error } = await supabase.storage.from('write-assets').upload(path, file, {
+    cacheControl: '3600',
+    upsert: false,
+  })
+  if (error) return null
+  const { data } = supabase.storage.from('write-assets').getPublicUrl(path)
+  return data.publicUrl
+}
+
 function contentToText(raw: unknown): string {
   if (!raw || typeof raw !== 'object') return ''
   const visit = (node: unknown): string => {
@@ -633,8 +656,13 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
         maxHeight: '28vh',
       }
 
+  const uploadCharacterImage = useCallback(
+    (file: File) => uploadWriteAssetToStorage(file, projectId),
+    [projectId]
+  )
+
   return (
-    <BinderProvider projectId={projectId}>
+    <BinderProvider projectId={projectId} uploadCharacterImage={uploadCharacterImage}>
       <ProjectWorkspaceBody
         containerRef={containerRef}
         binderColumnStyle={binderColumnStyle}
