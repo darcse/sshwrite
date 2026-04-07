@@ -1,6 +1,7 @@
 'use client'
 
 import { BinderProvider, BinderTree, useBinderContext } from '@/components/binder/BinderTree'
+import { AssistantPanel } from '@/components/assistant/AssistantPanel'
 import { Editor } from '@/components/editor/Editor'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -21,6 +22,7 @@ import {
   useState,
   Suspense,
   type CSSProperties,
+  type RefObject,
 } from 'react'
 import { useParams } from 'next/navigation'
 
@@ -47,6 +49,18 @@ const LABEL_COLORS = [
   '#5856d6',
   '#ff2d55',
 ]
+
+function contentToText(raw: unknown): string {
+  if (!raw || typeof raw !== 'object') return ''
+  const visit = (node: unknown): string => {
+    if (!node || typeof node !== 'object') return ''
+    const o = node as { text?: string; content?: unknown[] }
+    const text = typeof o.text === 'string' ? o.text : ''
+    const children = Array.isArray(o.content) ? o.content.map(visit).join(' ') : ''
+    return `${text} ${children}`.trim()
+  }
+  return visit(raw).replace(/\s+/g, ' ').trim()
+}
 
 function BinderPanelToggleIcon() {
   return (
@@ -467,6 +481,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [binderWidth, setBinderWidth] = useState(DEFAULT_BINDER)
   const [inspectorWidth, setInspectorWidth] = useState(DEFAULT_INSPECTOR)
   const [binderCollapsed, setBinderCollapsed] = useState(false)
+  const [inspectorTab, setInspectorTab] = useState<'inspector' | 'ai'>('inspector')
   const [hydrated, setHydrated] = useState(false)
   const [desktop, setDesktop] = useState(false)
 
@@ -607,10 +622,53 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
 
   return (
     <BinderProvider projectId={projectId}>
-        <div
+      <ProjectWorkspaceBody
+        containerRef={containerRef}
+        binderColumnStyle={binderColumnStyle}
+        inspectorStyle={inspectorStyle}
+        desktop={desktop}
+        binderCollapsed={binderCollapsed}
+        toggleBinder={toggleBinder}
+        startDragBinder={startDragBinder}
+        startDragInspector={startDragInspector}
+        inspectorTab={inspectorTab}
+        setInspectorTab={setInspectorTab}
+      />
+    </BinderProvider>
+  )
+}
+
+function ProjectWorkspaceBody({
+  containerRef,
+  binderColumnStyle,
+  inspectorStyle,
+  desktop,
+  binderCollapsed,
+  toggleBinder,
+  startDragBinder,
+  startDragInspector,
+  inspectorTab,
+  setInspectorTab,
+}: {
+  containerRef: RefObject<HTMLDivElement | null>
+  binderColumnStyle: CSSProperties
+  inspectorStyle: CSSProperties
+  desktop: boolean
+  binderCollapsed: boolean
+  toggleBinder: () => void
+  startDragBinder: (e: React.MouseEvent) => void
+  startDragInspector: (e: React.MouseEvent) => void
+  inspectorTab: 'inspector' | 'ai'
+  setInspectorTab: (tab: 'inspector' | 'ai') => void
+}) {
+  const { documents, selectedDocId } = useBinderContext()
+  const selectedDoc = selectedDocId ? documents.find((d) => d.id === selectedDocId) : undefined
+  const selectedDocText = selectedDoc?.type === 'document' ? contentToText(selectedDoc.content) : ''
+  return (
+    <div
           ref={containerRef}
           className="flex min-h-0 w-full flex-1 flex-col border-t border-[var(--border)] bg-[var(--background)] md:h-[calc(100dvh-3.5rem)] md:flex-row md:overflow-hidden"
-        >
+    >
         <div
           className="flex min-h-0 shrink-0 flex-col border-b border-[var(--border)] bg-[var(--card-bg)] transition-[width] duration-200 ease-out md:h-full md:border-b-0 md:border-r"
           style={binderColumnStyle}
@@ -686,23 +744,47 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
           onMouseDown={startDragInspector}
         />
 
-        <aside
+      <aside
           className="flex min-h-0 shrink-0 flex-col border-t border-[var(--border)] bg-[var(--card-bg)] md:h-full md:border-t-0 md:border-l"
           style={{
             ...inspectorStyle,
             borderColor: 'var(--border)',
           }}
           data-panel="inspector"
-        >
-          <div className="flex h-12 shrink-0 items-center border-b border-[var(--border)] px-3 text-sm font-medium text-[var(--foreground)]">
+      >
+        <div className="flex h-12 shrink-0 items-end gap-4 border-b border-[var(--border)] px-3 text-sm font-medium">
+          <button
+            type="button"
+            onClick={() => setInspectorTab('inspector')}
+            className="h-full border-b-2 px-0.5"
+            style={{
+              color: inspectorTab === 'inspector' ? 'var(--foreground)' : 'var(--muted)',
+              borderBottomColor: inspectorTab === 'inspector' ? 'var(--foreground)' : 'transparent',
+            }}
+          >
             Inspector
-          </div>
-          <div className="min-h-0 flex-1 overflow-auto p-3 text-sm text-[var(--muted)]">
+          </button>
+          <button
+            type="button"
+            onClick={() => setInspectorTab('ai')}
+            className="h-full border-b-2 px-0.5"
+            style={{
+              color: inspectorTab === 'ai' ? 'var(--foreground)' : 'var(--muted)',
+              borderBottomColor: inspectorTab === 'ai' ? 'var(--foreground)' : 'transparent',
+            }}
+          >
+            AI
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto p-3 text-sm text-[var(--muted)]">
+          {inspectorTab === 'inspector' ? (
             <InspectorPanel />
-          </div>
-        </aside>
-      </div>
-    </BinderProvider>
+          ) : (
+            <AssistantPanel documentText={selectedDocText} />
+          )}
+        </div>
+      </aside>
+    </div>
   )
 }
 

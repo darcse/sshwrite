@@ -60,6 +60,12 @@ export function Editor({
   const [wordCount, setWordCount] = useState(0)
   const [targetWords, setTargetWords] = useState<number | null>(null)
   const [inspectorMount, setInspectorMount] = useState<HTMLElement | null>(null)
+  const [aiActionLoading, setAiActionLoading] = useState(false)
+  const [selectionMenu, setSelectionMenu] = useState<{
+    visible: boolean
+    top: number
+    left: number
+  }>({ visible: false, top: 0, left: 0 })
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedClearRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastPersistedJson = useRef<string>('')
@@ -178,6 +184,43 @@ export function Editor({
   }, [editor])
 
   useEffect(() => {
+    if (!editor) return
+    const updateSelectionMenu = () => {
+      const { empty } = editor.state.selection
+      if (empty) {
+        setSelectionMenu((prev) => ({ ...prev, visible: false }))
+        return
+      }
+      const sel = window.getSelection()
+      if (!sel || sel.rangeCount === 0) {
+        setSelectionMenu((prev) => ({ ...prev, visible: false }))
+        return
+      }
+      const rect = sel.getRangeAt(0).getBoundingClientRect()
+      if (rect.width === 0 && rect.height === 0) {
+        setSelectionMenu((prev) => ({ ...prev, visible: false }))
+        return
+      }
+      setSelectionMenu({
+        visible: true,
+        top: rect.top + window.scrollY - 42,
+        left: rect.left + window.scrollX + rect.width / 2,
+      })
+    }
+    updateSelectionMenu()
+    editor.on('selectionUpdate', updateSelectionMenu)
+    editor.on('transaction', updateSelectionMenu)
+    window.addEventListener('scroll', updateSelectionMenu, true)
+    window.addEventListener('resize', updateSelectionMenu)
+    return () => {
+      editor.off('selectionUpdate', updateSelectionMenu)
+      editor.off('transaction', updateSelectionMenu)
+      window.removeEventListener('scroll', updateSelectionMenu, true)
+      window.removeEventListener('resize', updateSelectionMenu)
+    }
+  }, [editor])
+
+  useEffect(() => {
     if (!focusMode) return
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
@@ -256,6 +299,43 @@ export function Editor({
       : null
   const overTarget = targetWords != null && targetWords > 0 && wordCount > targetWords
 
+  const runSelectionAiAction = useCallback(
+    async (mode: 'polish' | 'continue' | 'summarize') => {
+      if (!editor || aiActionLoading) return
+      const { from, to, empty } = editor.state.selection
+      if (empty) return
+      const selection = editor.state.doc.textBetween(from, to, ' ').trim()
+      if (!selection) return
+      setAiActionLoading(true)
+      try {
+        const res = await fetch('/api/assistant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode, selection }),
+        })
+        const json = (await res.json()) as { text?: string }
+        if (!res.ok || !json.text) return
+        const next = json.text.trim()
+        if (!next) return
+        const chain = editor.chain().focus()
+        if (mode === 'continue') {
+          chain
+            .setTextSelection(to)
+            .insertContent(` ${next}`)
+            .run()
+        } else {
+          chain
+            .setTextSelection({ from, to })
+            .insertContent(next)
+            .run()
+        }
+      } finally {
+        setAiActionLoading(false)
+      }
+    },
+    [editor, aiActionLoading]
+  )
+
   return (
     <div
       className={
@@ -281,6 +361,7 @@ export function Editor({
 }}>
   <EditorToolbar editor={editor} />
   <div
+    className="relative"
     style={{
       padding: '16px 8px',
       fontFamily: 'var(--font-writing)',
@@ -289,6 +370,42 @@ export function Editor({
       outline: 'none',
     }}
   >
+            {selectionMenu.visible ? (
+              <div
+                className="fixed z-[320] flex -translate-x-1/2 items-center gap-1 rounded border px-1 py-1"
+                style={{
+                  top: selectionMenu.top,
+                  left: selectionMenu.left,
+                  borderColor: 'var(--border)',
+                  backgroundColor: 'var(--card-bg)',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => void runSelectionAiAction('polish')}
+                  disabled={aiActionLoading}
+                  className="rounded px-2 py-1 text-xs text-[var(--muted)] transition-colors hover:text-[var(--foreground)] disabled:opacity-50"
+                >
+                  다듬기
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void runSelectionAiAction('continue')}
+                  disabled={aiActionLoading}
+                  className="rounded px-2 py-1 text-xs text-[var(--muted)] transition-colors hover:text-[var(--foreground)] disabled:opacity-50"
+                >
+                  이어쓰기
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void runSelectionAiAction('summarize')}
+                  disabled={aiActionLoading}
+                  className="rounded px-2 py-1 text-xs text-[var(--muted)] transition-colors hover:text-[var(--foreground)] disabled:opacity-50"
+                >
+                  요약
+                </button>
+              </div>
+            ) : null}
             <EditorContent editor={editor} />
           </div>
         </div>
