@@ -4,9 +4,11 @@ import { BinderProvider, BinderTree, useBinderContext } from '@/components/binde
 import { AssistantPanel } from '@/components/assistant/AssistantPanel'
 import { Corkboard } from '@/components/corkboard/Corkboard'
 import { Editor } from '@/components/editor/Editor'
+import { ReadingMode } from '@/components/editor/ReadingMode'
 import { PomodoroTimer } from '@/components/ui/PomodoroTimer'
 import { createClient } from '@/lib/supabase/client'
 import {
+  BookOpen,
   CheckCircle2,
   Circle,
   Expand,
@@ -190,12 +192,23 @@ function EditorPanel() {
   const { documents, labels, selectedDocId, updateDocument, navigateToDoc } = useBinderContext()
   const doc = selectedDocId ? documents.find((d) => d.id === selectedDocId) : undefined
   const [focusMode, setFocusMode] = useState(false)
+  const [readingOpen, setReadingOpen] = useState(false)
   return (
     <>
+      <ReadingMode open={readingOpen} onClose={() => setReadingOpen(false)} />
       <div className="flex h-12 min-w-0 shrink-0 items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--card-bg)] px-3 text-sm font-medium text-[var(--foreground)]">
         <span className="min-w-0 flex-1 truncate">{doc ? doc.title : '문서를 선택하세요'}</span>
         <div className="flex items-center gap-1">
           <PomodoroTimer />
+          <button
+            type="button"
+            className="shrink-0 rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
+            onClick={() => setReadingOpen(true)}
+            aria-label="읽기 모드"
+            title="읽기 모드"
+          >
+            <BookOpen className="h-5 w-5" strokeWidth={2} aria-hidden />
+          </button>
           <button
             type="button"
             className="shrink-0 rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
