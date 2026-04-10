@@ -191,7 +191,7 @@ function BinderHeaderBar({ onCollapse }: { onCollapse: () => void }) {
   )
 }
 
-function EditorPanel() {
+function EditorPanel({ showInspectorMeta }: { showInspectorMeta: boolean }) {
   const { documents, labels, selectedDocId, updateDocument, navigateToDoc } = useBinderContext()
   const doc = selectedDocId ? documents.find((d) => d.id === selectedDocId) : undefined
   const [focusMode, setFocusMode] = useState(false)
@@ -263,6 +263,9 @@ function EditorPanel() {
             key={doc.id}
             documentId={doc.id}
             initialContent={doc.content}
+            createdAt={(doc as unknown as { created_at?: string | null }).created_at ?? null}
+            updatedAt={(doc as unknown as { updated_at?: string | null }).updated_at ?? null}
+            showInspectorMeta={showInspectorMeta}
             focusMode={focusMode}
             onFocusModeChange={setFocusMode}
           />
@@ -828,7 +831,7 @@ function ProjectWorkspaceBody({
               <button
                 type="button"
                 onClick={toggleBinder}
-                className="sticky top-0 z-10 flex h-12 w-7 shrink-0 items-center justify-center border-r border-[var(--border)] bg-[var(--card-bg)] text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
+                className="sticky top-0 z-10 flex h-12 w-7 shrink-0 items-center justify-center border-r border-b border-[var(--border)] bg-[var(--card-bg)] text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
                 aria-expanded={false}
                 aria-controls="binder-panel"
                 title="바인더 펼치기"
@@ -879,7 +882,7 @@ function ProjectWorkspaceBody({
           className="flex min-h-[40vh] min-w-0 flex-1 flex-col overflow-hidden border-b border-[var(--border)] md:min-h-0 md:border-b-0"
           data-panel="editor"
         >
-          <EditorPanel />
+          <EditorPanel showInspectorMeta={inspectorTab === 'inspector'} />
         </main>
 
         <div
@@ -926,7 +929,10 @@ function ProjectWorkspaceBody({
           </button>
         </div>
         <div className="min-h-0 flex-1 p-3 text-sm text-[var(--muted)]">
-          <div className={inspectorTab === 'inspector' ? 'h-full overflow-auto' : 'hidden'}>
+          <div
+            data-inspector-panel-content
+            className={inspectorTab === 'inspector' ? 'h-full overflow-auto' : 'hidden'}
+          >
             <InspectorPanel />
           </div>
           <div className={inspectorTab === 'ai' ? 'flex h-full min-h-0 flex-col overflow-hidden' : 'hidden'}>

@@ -33,11 +33,17 @@ type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 export function Editor({
   documentId,
   initialContent,
+  createdAt,
+  updatedAt,
+  showInspectorMeta,
   focusMode,
   onFocusModeChange,
 }: {
   documentId: string
   initialContent: unknown
+  createdAt: string | null
+  updatedAt: string | null
+  showInspectorMeta: boolean
   focusMode: boolean
   onFocusModeChange: (v: boolean) => void
 }) {
@@ -252,7 +258,7 @@ export function Editor({
 
   useLayoutEffect(() => {
     const host = document.querySelector(
-      'aside[data-panel="inspector"] > div:last-child'
+      'aside[data-panel="inspector"] [data-inspector-panel-content]'
     ) as HTMLElement | null
     if (!host) return
     const el = document.createElement('div')
@@ -285,6 +291,19 @@ export function Editor({
       ? Math.min(100, (wordCount / targetWords) * 100)
       : null
   const overTarget = targetWords != null && targetWords > 0 && wordCount > targetWords
+
+  const formatDateTime = useCallback((iso: string | null) => {
+    if (!iso) return '-'
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return '-'
+    return d.toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }, [])
 
   const runSelectionAiAction = useCallback(
     async (mode: 'polish' | 'continue' | 'summarize') => {
@@ -397,45 +416,48 @@ export function Editor({
           </div>
         </div>
       </div>
-      {inspectorMount
+      {showInspectorMeta && inspectorMount
         ? createPortal(
-            <div
-              className="mb-8 border-b pb-4"
-              style={{ borderColor: 'var(--border)' }}
-            >
-              <label className="flex flex-col gap-1.5 text-sm">
-                <span className="text-[var(--muted)]">목표 단어 수</span>
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={targetWords ?? ''}
-                  placeholder="미설정"
-                  onChange={(e) => onGoalInput(e.target.value)}
-                  className="w-full rounded border border-[var(--border)] bg-[var(--card-bg)] px-2 py-1.5 text-sm text-[var(--foreground)] outline-none"
-                />
-              </label>
-              <div className="mt-3 flex items-baseline justify-between gap-2 text-xs text-[var(--muted)]">
-                <span style={{ color: overTarget ? '#ff3b30' : 'var(--foreground)' }}>
-                  {wordCount}
-                  {targetWords != null && targetWords > 0 ? ` / ${targetWords}` : ''}{' '}
-                  단어
-                </span>
-              </div>
-              {progressPct != null ? (
-                <div
-                  className="mt-2 h-1 w-full overflow-hidden rounded-full"
-                  style={{ backgroundColor: 'var(--badge-bg)' }}
-                >
-                  <div
-                    className="h-full rounded-full transition-[width]"
-                    style={{
-                      width: `${progressPct}%`,
-                      backgroundColor: overTarget ? '#ff3b30' : 'var(--accent)',
-                    }}
+            <div className="mb-8">
+              <div className="border-b pb-5" style={{ borderColor: 'var(--border)' }}>
+                <label className="flex flex-col gap-1.5 text-sm">
+                  <span className="text-[var(--muted)]">목표 단어 수</span>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={targetWords ?? ''}
+                    placeholder="미설정"
+                    onChange={(e) => onGoalInput(e.target.value)}
+                    className="w-full rounded border border-[var(--border)] bg-[var(--card-bg)] px-2 py-1.5 text-sm text-[var(--foreground)] outline-none"
                   />
+                </label>
+                <div className="mt-3 flex items-baseline justify-between gap-2 text-xs text-[var(--muted)]">
+                  <span style={{ color: overTarget ? '#ff3b30' : 'var(--foreground)' }}>
+                    {wordCount}
+                    {targetWords != null && targetWords > 0 ? ` / ${targetWords}` : ''}{' '}
+                    단어
+                  </span>
                 </div>
-              ) : null}
+                {progressPct != null ? (
+                  <div
+                    className="mt-2 h-1 w-full overflow-hidden rounded-full"
+                    style={{ backgroundColor: 'var(--badge-bg)' }}
+                  >
+                    <div
+                      className="h-full rounded-full transition-[width]"
+                      style={{
+                        width: `${progressPct}%`,
+                        backgroundColor: overTarget ? '#ff3b30' : 'var(--accent)',
+                      }}
+                    />
+                  </div>
+                ) : null}
+              </div>
+              <div className="pt-5 text-xs text-[var(--muted)]">
+                <p>최초 등록 {formatDateTime(createdAt)}</p>
+                <p>최종 수정 {formatDateTime(updatedAt)}</p>
+              </div>
             </div>,
             inspectorMount
           )

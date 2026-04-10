@@ -53,7 +53,7 @@ export function ProjectCard({ project, deleting, onEdit, onDelete }: ProjectCard
     <article className="group card-apple relative overflow-hidden">
       <div className="relative">
         <Link href={`/projects/${project.id}`} className="block">
-          <div className="relative min-h-[172px] overflow-hidden px-4 pb-12 pt-5">
+          <div className="relative min-h-[206px] overflow-hidden px-4 pb-12 pt-5">
             {coverImage ? (
               <div className="absolute inset-0 z-0">
                 <img src={coverImage} alt="" className="h-full w-full object-cover" />
@@ -93,11 +93,11 @@ export function ProjectCard({ project, deleting, onEdit, onDelete }: ProjectCard
             </h2>
           </div>
           <div className="space-y-2 p-4 pt-1">
-            <p className="truncate text-base font-bold text-[var(--foreground)]">{project.title}</p>
             <p className="line-clamp-1 text-sm text-[var(--muted)]">{project.description || ' '}</p>
             <p className="text-[13px] text-[var(--muted)]">
-              📄 {stats.document_total}개&nbsp;&nbsp;&nbsp;👤 {stats.character_count}명&nbsp;&nbsp;&nbsp;📍{' '}
-              {stats.place_count}곳
+              📄 {stats.document_total}개
+              {stats.character_count > 0 ? `   👤 ${stats.character_count}명` : ''}
+              {stats.place_count > 0 ? `   📍 ${stats.place_count}곳` : ''}
             </p>
             {total > 0 ? (
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--badge-bg)]">
