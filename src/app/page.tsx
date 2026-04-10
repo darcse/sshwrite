@@ -27,6 +27,7 @@ export default function DashboardPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const loadProjects = useCallback(async () => {
+    setListLoading(true)
     const supabase = createClient()
     const {
       data: { user },
@@ -42,14 +43,15 @@ export default function DashboardPage() {
       .select('id, title, description, cover_color, updated_at')
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
-    setListLoading(false)
     if (error) {
       setProjects([])
+      setListLoading(false)
       return
     }
     const base = (data ?? []) as DashboardProject[]
     if (base.length === 0) {
       setProjects([])
+      setListLoading(false)
       return
     }
     const projectIds = base.map((p) => p.id)
@@ -113,6 +115,7 @@ export default function DashboardPage() {
         },
       }))
     )
+    setListLoading(false)
   }, [])
 
   useEffect(() => {

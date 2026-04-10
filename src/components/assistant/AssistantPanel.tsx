@@ -1,7 +1,7 @@
 'use client'
 
 import { Loader2, Send, Sparkles } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type ChatMessage = {
   role: 'user' | 'assistant'
@@ -9,14 +9,23 @@ type ChatMessage = {
 }
 
 export function AssistantPanel({
+  documentId,
   documentText,
 }: {
+  documentId: string | null
   documentText: string
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    setMessages([])
+    setInput('')
+    setError('')
+    setLoading(false)
+  }, [documentId])
 
   async function callAssistant(payload: Record<string, unknown>) {
     const res = await fetch('/api/assistant', {

@@ -390,8 +390,24 @@ function InspectorPanel() {
 
   async function clearLabel() {
     if (!doc || doc.type !== 'document') return
+    setSaving(true)
     setLabelName('')
-    await patch({ label: null })
+    setLabelColor(LABEL_COLORS[0])
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      setSaving(false)
+      return
+    }
+    await supabase
+      .from('write_documents')
+      .update({ label_id: null } as Record<string, unknown>)
+      .eq('id', doc.id)
+      .eq('user_id', user.id)
+    await refresh()
+    setSaving(false)
   }
 
   async function generateSynopsis() {
@@ -548,7 +564,7 @@ function InspectorPanel() {
           <button
             type="button"
             onClick={clearLabel}
-            disabled={saving || !doc.label}
+            disabled={saving || !docLabelId}
             className="rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)] disabled:opacity-50"
             aria-label="라벨 제거"
           >
@@ -909,16 +925,13 @@ function ProjectWorkspaceBody({
             AI
           </button>
         </div>
-        <div
-          className={`min-h-0 flex-1 p-3 text-sm text-[var(--muted)] ${
-            inspectorTab === 'ai' ? 'flex flex-col overflow-hidden' : 'overflow-auto'
-          }`}
-        >
-          {inspectorTab === 'inspector' ? (
+        <div className="min-h-0 flex-1 p-3 text-sm text-[var(--muted)]">
+          <div className={inspectorTab === 'inspector' ? 'h-full overflow-auto' : 'hidden'}>
             <InspectorPanel />
-          ) : (
-            <AssistantPanel documentText={selectedDocText} />
-          )}
+          </div>
+          <div className={inspectorTab === 'ai' ? 'flex h-full min-h-0 flex-col overflow-hidden' : 'hidden'}>
+            <AssistantPanel documentId={selectedDocId ?? null} documentText={selectedDocText} />
+          </div>
         </div>
       </aside>
     </div>

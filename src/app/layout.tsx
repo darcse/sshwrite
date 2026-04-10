@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { Geist, Geist_Mono } from 'next/font/google'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { LogIn, Monitor, Moon, Sun } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
@@ -31,6 +31,7 @@ function applyTheme(mode: ThemeMode) {
 
 function HeaderBar() {
   const router = useRouter()
+  const pathname = usePathname()
   const [userPresent, setUserPresent] = useState(false)
   const [ready, setReady] = useState(false)
   const [logoutLoading, setLogoutLoading] = useState(false)
@@ -82,12 +83,18 @@ function HeaderBar() {
 
   return (
     <header className="border-b border-[var(--border)] bg-[var(--background)]">
-      <div className="relative flex h-12 w-full items-center justify-end pr-4">
+      <div
+        className={
+          pathname === '/'
+            ? 'mx-auto flex h-12 w-full max-w-6xl items-center justify-between px-4'
+            : 'relative flex h-12 w-full items-center justify-end pr-4'
+        }
+      >
         <Link
           href="/"
-          className="absolute top-1/2 -translate-y-1/2"
+          className={pathname === '/' ? '' : 'absolute top-1/2 -translate-y-1/2'}
           style={{
-            left: 16,
+            left: pathname === '/' ? undefined : 16,
             fontWeight: 700,
             fontSize: '16px',
             color: 'var(--foreground)',

@@ -67,11 +67,11 @@ export function CorkboardCard({
           {editing ? (
             <textarea
               autoFocus
-              rows={3}
+              rows={6}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onBlur={handleBlur}
-              className="input-apple min-h-16 w-full resize-none px-2 py-1.5 text-sm"
+              className="input-apple h-32 w-full resize-none px-2 py-1.5 text-sm"
             />
           ) : (
             <button
@@ -80,7 +80,7 @@ export function CorkboardCard({
                 setDraft(synopsis ?? '')
                 setEditing(true)
               }}
-              className="min-h-16 w-full text-left text-sm text-[var(--muted)]"
+              className="h-32 w-full overflow-auto text-left text-sm text-[var(--muted)]"
             >
               {synopsis?.trim() ? synopsis : '시놉시스를 입력하세요'}
             </button>
