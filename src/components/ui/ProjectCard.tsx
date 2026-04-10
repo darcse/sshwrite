@@ -96,8 +96,8 @@ export function ProjectCard({ project, deleting, onEdit, onDelete }: ProjectCard
             <p className="line-clamp-1 text-sm text-[var(--muted)]">{project.description || ' '}</p>
             <p className="text-[13px] text-[var(--muted)]">
               📄 {stats.document_total}개
-              {stats.character_count > 0 ? `   👤 ${stats.character_count}명` : ''}
-              {stats.place_count > 0 ? `   📍 ${stats.place_count}곳` : ''}
+              {project.type !== 'lyrics' && stats.character_count > 0 ? `   👤 ${stats.character_count}명` : ''}
+              {project.type !== 'lyrics' && stats.place_count > 0 ? `   📍 ${stats.place_count}곳` : ''}
             </p>
             {total > 0 ? (
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--badge-bg)]">
