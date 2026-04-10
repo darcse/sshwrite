@@ -7,6 +7,14 @@ import { useCallback, useEffect, useState } from 'react'
 
 type DashboardProject = ProjectModalProject & {
   place_image_url?: string | null
+  stats: {
+    document_total: number
+    todo: number
+    writing: number
+    done: number
+    character_count: number
+    place_count: number
+  }
 }
 
 export default function DashboardPage() {
@@ -45,25 +53,64 @@ export default function DashboardPage() {
       return
     }
     const projectIds = base.map((p) => p.id)
-    const { data: placeRows } = await supabase
-      .from('write_characters')
-      .select('project_id, image_url, order_index')
+    const { data: documentRows } = await supabase
+      .from('write_documents')
+      .select('project_id, status')
       .eq('user_id', user.id)
-      .eq('type', 'place')
       .in('project_id', projectIds)
-      .not('image_url', 'is', null)
+    const { data: characterRows } = await supabase
+      .from('write_characters')
+      .select('project_id, type, image_url, order_index')
+      .eq('user_id', user.id)
+      .in('project_id', projectIds)
       .order('order_index', { ascending: true })
-    const firstImageByProject = new Map<string, string>()
-    ;(placeRows ?? []).forEach((row) => {
+    const docStatsByProject = new Map<
+      string,
+      { document_total: number; todo: number; writing: number; done: number }
+    >()
+    ;(documentRows ?? []).forEach((row) => {
       const projectId = (row as { project_id?: string }).project_id
+      const status = (row as { status?: string | null }).status
+      if (!projectId) return
+      const prev = docStatsByProject.get(projectId) ?? {
+        document_total: 0,
+        todo: 0,
+        writing: 0,
+        done: 0,
+      }
+      prev.document_total += 1
+      if (status === 'todo') prev.todo += 1
+      else if (status === 'writing') prev.writing += 1
+      else if (status === 'done') prev.done += 1
+      docStatsByProject.set(projectId, prev)
+    })
+    const charStatsByProject = new Map<string, { character_count: number; place_count: number }>()
+    const firstImageByProject = new Map<string, string>()
+    ;(characterRows ?? []).forEach((row) => {
+      const projectId = (row as { project_id?: string }).project_id
+      const type = (row as { type?: string | null }).type
       const imageUrl = (row as { image_url?: string | null }).image_url
-      if (!projectId || !imageUrl || firstImageByProject.has(projectId)) return
-      firstImageByProject.set(projectId, imageUrl)
+      if (!projectId) return
+      const prev = charStatsByProject.get(projectId) ?? { character_count: 0, place_count: 0 }
+      if (type === 'character') prev.character_count += 1
+      else if (type === 'place') prev.place_count += 1
+      charStatsByProject.set(projectId, prev)
+      if (type === 'place' && imageUrl && !firstImageByProject.has(projectId)) {
+        firstImageByProject.set(projectId, imageUrl)
+      }
     })
     setProjects(
       base.map((p) => ({
         ...p,
         place_image_url: firstImageByProject.get(p.id) ?? null,
+        stats: {
+          document_total: docStatsByProject.get(p.id)?.document_total ?? 0,
+          todo: docStatsByProject.get(p.id)?.todo ?? 0,
+          writing: docStatsByProject.get(p.id)?.writing ?? 0,
+          done: docStatsByProject.get(p.id)?.done ?? 0,
+          character_count: charStatsByProject.get(p.id)?.character_count ?? 0,
+          place_count: charStatsByProject.get(p.id)?.place_count ?? 0,
+        },
       }))
     )
   }, [])

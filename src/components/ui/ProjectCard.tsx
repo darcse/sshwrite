@@ -4,8 +4,17 @@ import Link from 'next/link'
 import type { ProjectModalProject } from '@/components/ui/ProjectModal'
 import { Pencil, Trash2 } from 'lucide-react'
 
+type ProjectStats = {
+  document_total: number
+  todo: number
+  writing: number
+  done: number
+  character_count: number
+  place_count: number
+}
+
 type ProjectCardProps = {
-  project: ProjectModalProject
+  project: ProjectModalProject & { place_image_url?: string | null; stats?: ProjectStats }
   deleting: boolean
   onEdit: () => void
   onDelete: () => void
@@ -24,15 +33,27 @@ function formatUpdatedAt(iso: string | null | undefined) {
 
 export function ProjectCard({ project, deleting, onEdit, onDelete }: ProjectCardProps) {
   const coverColor = project.cover_color?.trim()
-  const coverImage = (project as ProjectModalProject & { place_image_url?: string | null }).place_image_url
+  const coverImage = project.place_image_url
   const updatedLabel = formatUpdatedAt(project.updated_at)
   const onCover = Boolean(coverColor || coverImage)
+  const stats = project.stats ?? {
+    document_total: 0,
+    todo: 0,
+    writing: 0,
+    done: 0,
+    character_count: 0,
+    place_count: 0,
+  }
+  const total = stats.document_total
+  const todoPct = total > 0 ? (stats.todo / total) * 100 : 0
+  const writingPct = total > 0 ? (stats.writing / total) * 100 : 0
+  const donePct = total > 0 ? (stats.done / total) * 100 : 0
 
   return (
     <article className="group card-apple relative overflow-hidden">
       <div className="relative">
         <Link href={`/projects/${project.id}`} className="block">
-          <div className="relative min-h-[132px] overflow-hidden px-4 pb-12 pt-5">
+          <div className="relative min-h-[172px] overflow-hidden px-4 pb-12 pt-5">
             {coverImage ? (
               <div className="absolute inset-0 z-0">
                 <img src={coverImage} alt="" className="h-full w-full object-cover" />
@@ -72,11 +93,23 @@ export function ProjectCard({ project, deleting, onEdit, onDelete }: ProjectCard
             </h2>
           </div>
           <div className="space-y-2 p-4 pt-1">
-            {project.description ? (
-              <p className="line-clamp-2 text-sm text-[var(--muted)]">{project.description}</p>
+            <p className="truncate text-base font-bold text-[var(--foreground)]">{project.title}</p>
+            <p className="line-clamp-1 text-sm text-[var(--muted)]">{project.description || ' '}</p>
+            <p className="text-[13px] text-[var(--muted)]">
+              📄 {stats.document_total}개&nbsp;&nbsp;&nbsp;👤 {stats.character_count}명&nbsp;&nbsp;&nbsp;📍{' '}
+              {stats.place_count}곳
+            </p>
+            {total > 0 ? (
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--badge-bg)]">
+                <div className="flex h-full w-full">
+                  <div style={{ width: `${todoPct}%`, backgroundColor: 'var(--badge-bg)' }} />
+                  <div style={{ width: `${writingPct}%`, backgroundColor: 'var(--accent)' }} />
+                  <div style={{ width: `${donePct}%`, backgroundColor: '#34C759' }} />
+                </div>
+              </div>
             ) : null}
             {updatedLabel ? (
-              <p className="text-xs text-[var(--muted)]">최근 수정 {updatedLabel}</p>
+              <p className="text-[12px] text-[var(--muted)]">최근 수정 {updatedLabel}</p>
             ) : null}
           </div>
         </Link>
