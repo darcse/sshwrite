@@ -32,15 +32,8 @@ import {
 } from 'docx'
 import { FileOutput, GripVertical, X } from 'lucide-react'
 import { Markdown } from 'tiptap-markdown'
+import { sortByOrder, getChildren, tiptapToPlainText } from '@/lib/doc-utils'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-
-function sortByOrder(docs: DocRow[]) {
-  return [...docs].sort((a, b) => a.order_index - b.order_index)
-}
-
-function getChildren(docs: DocRow[], parentId: string | null) {
-  return sortByOrder(docs.filter((d) => d.parent_id === parentId))
-}
 
 function collectDocumentIdsInTreeOrder(documents: DocRow[]): string[] {
   const ids: string[] = []
@@ -54,25 +47,13 @@ function collectDocumentIdsInTreeOrder(documents: DocRow[]): string[] {
   return ids
 }
 
-function contentToPlainText(raw: unknown): string {
-  if (!raw || typeof raw !== 'object') return ''
-  const visit = (node: unknown): string => {
-    if (!node || typeof node !== 'object') return ''
-    const o = node as { text?: string; content?: unknown[] }
-    const text = typeof o.text === 'string' ? o.text : ''
-    const children = Array.isArray(o.content) ? o.content.map(visit).join(' ') : ''
-    return `${text} ${children}`.trim()
-  }
-  return visit(raw).replace(/\s+/g, ' ').trim()
-}
-
 function isContentEmpty(content: unknown): boolean {
   if (content == null) return true
   if (typeof content !== 'object') return true
   const o = content as { type?: string; content?: unknown[] }
-  if (o.type !== 'doc') return contentToPlainText(content).length === 0
+  if (o.type !== 'doc') return tiptapToPlainText(content).length === 0
   if (!Array.isArray(o.content) || o.content.length === 0) return true
-  return contentToPlainText(content).length === 0
+  return tiptapToPlainText(content).length === 0
 }
 
 function folderTitleChain(documents: DocRow[], doc: DocRow): string[] {
@@ -352,38 +333,42 @@ export function CompileModal({ open, onClose }: { open: boolean; onClose: () => 
   }
 
   async function downloadDocx() {
-    const children: Paragraph[] = []
-    let prevPath: string[] = []
-    for (const id of orderedIds) {
-      if (!selectedIds.has(id)) continue
-      const doc = idToDoc.get(id)
-      if (!doc || isContentEmpty(doc.content)) continue
-      const path = folderTitleChain(documents, doc)
-      let i = 0
-      const n = Math.min(prevPath.length, path.length)
-      while (i < n && prevPath[i] === path[i]) i++
-      for (let j = i; j < path.length; j++) {
+    try {
+      const children: Paragraph[] = []
+      let prevPath: string[] = []
+      for (const id of orderedIds) {
+        if (!selectedIds.has(id)) continue
+        const doc = idToDoc.get(id)
+        if (!doc || isContentEmpty(doc.content)) continue
+        const path = folderTitleChain(documents, doc)
+        let i = 0
+        const n = Math.min(prevPath.length, path.length)
+        while (i < n && prevPath[i] === path[i]) i++
+        for (let j = i; j < path.length; j++) {
+          children.push(
+            new Paragraph({
+              heading: HeadingLevel.HEADING_1,
+              children: [new TextRun({ text: path[j] })],
+            })
+          )
+        }
+        prevPath = path
         children.push(
           new Paragraph({
-            heading: HeadingLevel.HEADING_1,
-            children: [new TextRun({ text: path[j] })],
+            heading: HeadingLevel.HEADING_2,
+            children: [new TextRun({ text: doc.title })],
           })
         )
+        children.push(...blocksFromDocContent(doc.content))
       }
-      prevPath = path
-      children.push(
-        new Paragraph({
-          heading: HeadingLevel.HEADING_2,
-          children: [new TextRun({ text: doc.title })],
-        })
-      )
-      children.push(...blocksFromDocContent(doc.content))
+      const file = new DocxFile({
+        sections: [{ children }],
+      })
+      const blob = await Packer.toBlob(file)
+      downloadBlob(blob, `${safeFileBase(projectTitle)}.docx`)
+    } catch {
+      window.alert('Word 파일 생성에 실패했습니다.')
     }
-    const file = new DocxFile({
-      sections: [{ children }],
-    })
-    const blob = await Packer.toBlob(file)
-    downloadBlob(blob, `${safeFileBase(projectTitle)}.docx`)
   }
 
   const hasExportable =

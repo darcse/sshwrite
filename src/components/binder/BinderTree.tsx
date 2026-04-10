@@ -19,6 +19,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { createClient } from '@/lib/supabase/client'
+import { sortByOrder, getChildren } from '@/lib/doc-utils'
 import { BinderItem } from '@/components/binder/BinderItem'
 import { CharacterPanel } from '@/components/binder/CharacterPanel'
 import {
@@ -43,9 +44,13 @@ export type DocRow = {
   content: unknown
   synopsis: string | null
   label: string | null
+  label_id?: string | null
+  memo?: string | null
   status: string
   order_index: number
   type: 'folder' | 'document'
+  created_at?: string | null
+  updated_at?: string | null
 }
 
 export type LabelRow = {
@@ -87,14 +92,6 @@ export function useBinderContext() {
 }
 
 const EMPTY_DOC: unknown = { type: 'doc', content: [] }
-
-function sortByOrder(docs: DocRow[]) {
-  return [...docs].sort((a, b) => a.order_index - b.order_index)
-}
-
-function getChildren(docs: DocRow[], parentId: string | null) {
-  return sortByOrder(docs.filter((d) => d.parent_id === parentId))
-}
 
 function nextOrderIndexForSiblings(siblings: DocRow[]): number {
   if (siblings.length === 0) return 0
@@ -258,16 +255,11 @@ export function BinderProvider({
       synopsis: null,
       status: 'todo',
     }
-    console.log('[BinderTree] write_documents insert (document)', {
-      insert: insertPayload,
-      getUser: authResult,
-    })
     const { data, error } = await supabase
       .from('write_documents')
       .insert(insertPayload)
       .select('id')
       .single()
-    console.log('[BinderTree] insert error', error)
     if (!error && data?.id) {
       await refresh()
       navigateToDoc(data.id)
@@ -294,12 +286,7 @@ export function BinderProvider({
       synopsis: null,
       status: 'todo',
     }
-    console.log('[BinderTree] write_documents insert (folder)', {
-      insert: insertPayload,
-      getUser: authResult,
-    })
     const { error } = await supabase.from('write_documents').insert(insertPayload)
-    console.log('[BinderTree] insert error', error)
     if (!error) await refresh()
   }, [creationParentId, documents, projectId, refresh])
 
@@ -489,13 +476,15 @@ export function BinderProvider({
         ...siblings.slice(insertIndex),
       ]
 
-      for (let i = 0; i < withActive.length; i++) {
-        await supabase
-          .from('write_documents')
-          .update({ parent_id: targetParent, order_index: i })
-          .eq('id', withActive[i].id)
-          .eq('user_id', user.id)
-      }
+      await Promise.all(
+        withActive.map((d, i) =>
+          supabase
+            .from('write_documents')
+            .update({ parent_id: targetParent, order_index: i })
+            .eq('id', d.id)
+            .eq('user_id', user.id)
+        )
+      )
       await refresh()
     },
     [clearDragState, documents, refresh]

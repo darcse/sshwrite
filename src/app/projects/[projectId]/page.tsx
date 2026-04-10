@@ -8,6 +8,7 @@ import { CompileModal } from '@/components/editor/CompileModal'
 import { ReadingMode } from '@/components/editor/ReadingMode'
 import { PomodoroTimer } from '@/components/ui/PomodoroTimer'
 import { createClient } from '@/lib/supabase/client'
+import { tiptapToPlainText } from '@/lib/doc-utils'
 import {
   BookOpen,
   CheckCircle2,
@@ -78,18 +79,6 @@ async function uploadWriteAssetToStorage(
   if (error) return null
   const { data } = supabase.storage.from('write-assets').getPublicUrl(path)
   return data.publicUrl
-}
-
-function contentToText(raw: unknown): string {
-  if (!raw || typeof raw !== 'object') return ''
-  const visit = (node: unknown): string => {
-    if (!node || typeof node !== 'object') return ''
-    const o = node as { text?: string; content?: unknown[] }
-    const text = typeof o.text === 'string' ? o.text : ''
-    const children = Array.isArray(o.content) ? o.content.map(visit).join(' ') : ''
-    return `${text} ${children}`.trim()
-  }
-  return visit(raw).replace(/\s+/g, ' ').trim()
 }
 
 function BinderPanelToggleIcon() {
@@ -263,8 +252,8 @@ function EditorPanel({ showInspectorMeta }: { showInspectorMeta: boolean }) {
             key={doc.id}
             documentId={doc.id}
             initialContent={doc.content}
-            createdAt={(doc as unknown as { created_at?: string | null }).created_at ?? null}
-            updatedAt={(doc as unknown as { updated_at?: string | null }).updated_at ?? null}
+            createdAt={doc.created_at ?? null}
+            updatedAt={doc.updated_at ?? null}
             showInspectorMeta={showInspectorMeta}
             focusMode={focusMode}
             onFocusModeChange={setFocusMode}
@@ -285,8 +274,7 @@ function InspectorPanel({ projectType }: { projectType: 'novel' | 'lyrics' }) {
   const [synopsisGenerating, setSynopsisGenerating] = useState(false)
   const [memoDraft, setMemoDraft] = useState('')
   const doc = selectedDocId ? documents.find((d) => d.id === selectedDocId) : undefined
-  const docLabelId =
-    ((doc as unknown as { label_id?: string | null })?.label_id ?? doc?.label) ?? null
+  const docLabelId = (doc?.label_id ?? doc?.label) ?? null
   const selectedLabel = labels.find((l) => l.id === docLabelId)
 
   async function patch(p: Parameters<typeof updateDocument>[1]) {
@@ -299,7 +287,7 @@ function InspectorPanel({ projectType }: { projectType: 'novel' | 'lyrics' }) {
   useEffect(() => {
     if (!doc || doc.type !== 'document') return
     setSynopsisDraft(doc.synopsis ?? '')
-    setMemoDraft(((doc as unknown as { memo?: string | null }).memo ?? '') as string)
+    setMemoDraft(doc.memo ?? '')
     if (selectedLabel) {
       setLabelColor(selectedLabel.color)
       setLabelName(selectedLabel.name)
@@ -323,19 +311,19 @@ function InspectorPanel({ projectType }: { projectType: 'novel' | 'lyrics' }) {
     if (!doc || doc.type !== 'document') return
     const timer = setTimeout(async () => {
       const next = memoDraft.trim()
-      const current = ((doc as unknown as { memo?: string | null }).memo ?? '') as string
+      const current = doc.memo ?? ''
       if (current === next) return
       const supabase = createClient()
       const {
         data: { user },
       } = await supabase.auth.getUser()
       if (!user) return
-      await supabase
+      const { error } = await supabase
         .from('write_documents')
-        .update({ memo: next || null } as Record<string, unknown>)
+        .update({ memo: next || null })
         .eq('id', doc.id)
         .eq('user_id', user.id)
-      await refresh()
+      if (!error) await refresh()
     }, 1000)
     return () => clearTimeout(timer)
   }, [memoDraft, doc?.id, refresh])
@@ -354,21 +342,27 @@ function InspectorPanel({ projectType }: { projectType: 'novel' | 'lyrics' }) {
       return
     }
     if (selectedLabel) {
-      await supabase
-        .from('write_document_labels')
-        .update({ name: nextName, color: labelColor })
-        .eq('id', selectedLabel.id)
-        .eq('user_id', user.id)
-      await supabase
-        .from('write_documents')
-        .update({ label_id: selectedLabel.id } as Record<string, unknown>)
-        .eq('id', doc.id)
-        .eq('user_id', user.id)
-      await refresh()
+      const [r1, r2] = await Promise.all([
+        supabase
+          .from('write_document_labels')
+          .update({ name: nextName, color: labelColor })
+          .eq('id', selectedLabel.id)
+          .eq('user_id', user.id),
+        supabase
+          .from('write_documents')
+          .update({ label_id: selectedLabel.id })
+          .eq('id', doc.id)
+          .eq('user_id', user.id),
+      ])
+      if (r1.error || r2.error) {
+        window.alert('라벨 저장에 실패했습니다.')
+      } else {
+        await refresh()
+      }
       setSaving(false)
       return
     }
-    const { data } = await supabase
+    const { data, error: insertErr } = await supabase
       .from('write_document_labels')
       .insert({
         project_id: projectId,
@@ -378,17 +372,22 @@ function InspectorPanel({ projectType }: { projectType: 'novel' | 'lyrics' }) {
       })
       .select('id')
       .single()
-    if (data?.id) {
-      await supabase
-        .from('write_documents')
-        .update({ label_id: data.id } as Record<string, unknown>)
-        .eq('id', doc.id)
-        .eq('user_id', user.id)
-      await refresh()
+    if (insertErr || !data?.id) {
+      window.alert('라벨 저장에 실패했습니다.')
       setSaving(false)
-    } else {
-      setSaving(false)
+      return
     }
+    const { error: updateErr } = await supabase
+      .from('write_documents')
+      .update({ label_id: data.id })
+      .eq('id', doc.id)
+      .eq('user_id', user.id)
+    if (updateErr) {
+      window.alert('라벨 저장에 실패했습니다.')
+    } else {
+      await refresh()
+    }
+    setSaving(false)
   }
 
   async function clearLabel() {
@@ -404,18 +403,22 @@ function InspectorPanel({ projectType }: { projectType: 'novel' | 'lyrics' }) {
       setSaving(false)
       return
     }
-    await supabase
+    const { error } = await supabase
       .from('write_documents')
-      .update({ label_id: null } as Record<string, unknown>)
+      .update({ label_id: null })
       .eq('id', doc.id)
       .eq('user_id', user.id)
-    await refresh()
+    if (error) {
+      window.alert('라벨 초기화에 실패했습니다.')
+    } else {
+      await refresh()
+    }
     setSaving(false)
   }
 
   async function generateSynopsis() {
     if (!doc || doc.type !== 'document') return
-    const plain = contentToText(doc.content)
+    const plain = tiptapToPlainText(doc.content)
     if (!plain.trim()) {
       window.alert(projectType === 'lyrics' ? '가사 내용을 먼저 작성해주세요' : '문서 내용을 먼저 작성해주세요')
       return
@@ -837,7 +840,7 @@ function ProjectWorkspaceBody({
 }) {
   const { documents, selectedDocId } = useBinderContext()
   const selectedDoc = selectedDocId ? documents.find((d) => d.id === selectedDocId) : undefined
-  const selectedDocText = selectedDoc?.type === 'document' ? contentToText(selectedDoc.content) : ''
+  const selectedDocText = selectedDoc?.type === 'document' ? tiptapToPlainText(selectedDoc.content) : ''
   return (
     <div
           ref={containerRef}

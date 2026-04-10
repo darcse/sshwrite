@@ -1,22 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
+import { tiptapToPlainText } from '@/lib/doc-utils'
 import { NextResponse } from 'next/server'
 
 type ReqBody = {
   content?: unknown
   title?: string
   type?: 'novel' | 'lyrics'
-}
-
-function tiptapToPlainText(raw: unknown): string {
-  if (!raw || typeof raw !== 'object') return ''
-  const visit = (node: unknown): string => {
-    if (!node || typeof node !== 'object') return ''
-    const o = node as { text?: string; content?: unknown[] }
-    const text = typeof o.text === 'string' ? o.text : ''
-    const children = Array.isArray(o.content) ? o.content.map(visit).join(' ') : ''
-    return `${text} ${children}`.trim()
-  }
-  return visit(raw).replace(/\s+/g, ' ').trim()
 }
 
 export async function POST(req: Request) {
