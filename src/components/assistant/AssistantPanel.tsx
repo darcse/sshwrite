@@ -79,19 +79,19 @@ export function AssistantPanel({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-3">
       <button
         type="button"
         onClick={() => void suggestIdeas()}
         disabled={loading}
-        className="inline-flex w-fit items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-semibold disabled:opacity-60"
+        className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-semibold disabled:opacity-60"
         style={{ backgroundColor: 'var(--badge-bg)', color: 'var(--foreground)' }}
       >
         <Sparkles className="h-3.5 w-3.5" aria-hidden />
         아이디어 제안
       </button>
-      <div className="min-h-0 flex-1 overflow-auto rounded border border-[var(--border)] bg-[var(--card-bg)] p-2">
-        <div className="flex flex-col gap-2">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto rounded border border-[var(--border)] bg-[var(--card-bg)] p-2">
+        <div className="flex min-h-0 flex-col gap-2">
           {messages.map((m, i) => (
             <div
               key={`${m.role}-${i}`}
@@ -113,19 +113,19 @@ export function AssistantPanel({
           {error ? <p className="text-xs text-[#ff3b30]">{error}</p> : null}
         </div>
       </div>
-      <div className="flex flex-col gap-2">
+      <div className="flex shrink-0 flex-col gap-2">
         <textarea
-          rows={3}
+          rows={6}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onInput={(e) => {
             const el = e.currentTarget
-            el.style.height = '80px'
-            el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+            el.style.height = '160px'
+            el.style.height = `${Math.min(el.scrollHeight, 320)}px`
           }}
           placeholder="프롬프트를 입력해 주세요"
           className="input-apple min-w-0 resize-none px-2 py-1.5 text-sm"
-          style={{ minHeight: 80, maxHeight: 160, overflowY: 'auto' }}
+          style={{ minHeight: 160, maxHeight: 320, overflowY: 'auto' }}
         />
         <div className="flex justify-end">
           <button

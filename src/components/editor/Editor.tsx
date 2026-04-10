@@ -2,8 +2,6 @@
 
 import { useEditor, EditorContent } from '@tiptap/react'
 import type { Editor as TiptapEditor } from '@tiptap/core'
-import { textblockTypeInputRule } from '@tiptap/core'
-import { Heading } from '@tiptap/extension-heading'
 import StarterKit from '@tiptap/starter-kit'
 import { createClient } from '@/lib/supabase/client'
 import { useBinderContext } from '@/components/binder/BinderTree'
@@ -31,18 +29,6 @@ function normalizeContent(raw: unknown) {
 }
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
-
-const MarkdownHeading = Heading.extend({
-  addInputRules() {
-    return this.options.levels.map((level) =>
-      textblockTypeInputRule({
-        find: new RegExp(`^${'#'.repeat(level)}\\s$`),
-        type: this.type,
-        getAttributes: { level },
-      })
-    )
-  },
-})
 
 export function Editor({
   documentId,
@@ -142,9 +128,10 @@ export function Editor({
     {
       extensions: [
         StarterKit.configure({
-          heading: false,
+          heading: {
+            levels: [1, 2, 3],
+          },
         }),
-        MarkdownHeading.configure({ levels: [1, 2, 3] }),
       ],
       content: normalizeContent(initialContent),
       immediatelyRender: false,
@@ -343,7 +330,7 @@ export function Editor({
           ? 'fixed bottom-0 left-0 right-0 top-14 z-[300] flex min-h-0 flex-col overflow-hidden bg-[var(--background)]'
           : 'flex min-h-0 flex-1 flex-col'
       }
-      style={{ backgroundColor: 'var(--background)' }}
+      style={{ backgroundColor: 'var(--card-bg)' }}
     >
       <style>{`.ProseMirror { outline: none !important; border: none !important; }`}</style>
       <div
@@ -361,7 +348,7 @@ export function Editor({
 }}>
   <EditorToolbar editor={editor} />
   <div
-    className="relative"
+    className="relative [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:leading-tight [&_h1]:mt-5 [&_h1]:mb-3 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:leading-tight [&_h2]:mt-4 [&_h2]:mb-2.5 [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:leading-snug [&_h3]:mt-3.5 [&_h3]:mb-2"
     style={{
       padding: '16px 8px',
       fontFamily: 'var(--font-writing)',

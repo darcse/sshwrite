@@ -16,6 +16,7 @@ import {
   FileOutput,
   FilePlus,
   FolderPlus,
+  Loader2,
   PenLine,
   Shrink,
   X,
@@ -278,6 +279,7 @@ function InspectorPanel() {
   const [labelColor, setLabelColor] = useState(LABEL_COLORS[0])
   const [labelName, setLabelName] = useState('')
   const [synopsisDraft, setSynopsisDraft] = useState('')
+  const [synopsisGenerating, setSynopsisGenerating] = useState(false)
   const [memoDraft, setMemoDraft] = useState('')
   const doc = selectedDocId ? documents.find((d) => d.id === selectedDocId) : undefined
   const docLabelId =
@@ -392,6 +394,38 @@ function InspectorPanel() {
     await patch({ label: null })
   }
 
+  async function generateSynopsis() {
+    if (!doc || doc.type !== 'document') return
+    const plain = contentToText(doc.content)
+    if (!plain.trim()) {
+      window.alert('문서 내용을 먼저 작성해주세요')
+      return
+    }
+    setSynopsisGenerating(true)
+    try {
+      const res = await fetch('/api/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: doc.content, title: doc.title }),
+      })
+      const data = (await res.json()) as { text?: string; error?: string }
+      if (!res.ok) {
+        window.alert(data.error || '요약 생성에 실패했습니다.')
+        return
+      }
+      const next = (data.text ?? '').trim()
+      if (!next) {
+        window.alert('요약을 가져오지 못했습니다.')
+        return
+      }
+      setSynopsisDraft(next)
+      await patch({ synopsis: next || null })
+      await refresh()
+    } finally {
+      setSynopsisGenerating(false)
+    }
+  }
+
   if (loading) {
     return <p className="text-[var(--muted)]">불러오는 중…</p>
   }
@@ -406,16 +440,30 @@ function InspectorPanel() {
 
   return (
     <div className="flex flex-col gap-6">
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-[var(--muted)]">시놉시스</span>
+      <div className="flex flex-col gap-1 text-sm">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[var(--muted)]">시놉시스</span>
+          <button
+            type="button"
+            disabled={synopsisGenerating || saving}
+            onClick={() => void generateSynopsis()}
+            className="btn-accent inline-flex shrink-0 items-center gap-1 rounded px-2 py-1 font-semibold disabled:opacity-50"
+            style={{ fontSize: 12 }}
+          >
+            {synopsisGenerating ? (
+              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
+            ) : null}
+            ✨ 자동생성
+          </button>
+        </div>
         <textarea
-          rows={3}
+          rows={7}
           value={synopsisDraft}
           onChange={(e) => setSynopsisDraft(e.target.value)}
           placeholder="시놉시스를 입력하세요"
-          className="input-apple w-full resize-none px-2 py-1.5 text-sm"
+          className="input-apple min-h-[168px] w-full resize-y px-2 py-1.5 text-sm"
         />
-      </label>
+      </div>
       <label className="flex flex-col gap-1 text-sm">
         <span className="text-[var(--muted)]">상태</span>
         <div className="flex items-center gap-1">
@@ -539,6 +587,11 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
     inspectorWidth: DEFAULT_INSPECTOR,
     binderCollapsed: false,
   })
+
+  const [workspaceReady, setWorkspaceReady] = useState(false)
+  useLayoutEffect(() => {
+    setWorkspaceReady(true)
+  }, [])
 
   const [binderWidth, setBinderWidth] = useState(DEFAULT_BINDER)
   const [inspectorWidth, setInspectorWidth] = useState(DEFAULT_INSPECTOR)
@@ -687,6 +740,19 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
     [projectId]
   )
 
+  if (!workspaceReady) {
+    return (
+      <div
+        className="flex min-h-0 flex-1 flex-col border-t border-[var(--border)] bg-[var(--card-bg)]"
+        aria-busy
+      >
+        <div className="flex min-h-[40vh] flex-1 items-center justify-center text-sm text-[var(--muted)] md:min-h-0">
+          불러오는 중…
+        </div>
+      </div>
+    )
+  }
+
   return (
     <BinderProvider projectId={projectId} uploadCharacterImage={uploadCharacterImage}>
       <ProjectWorkspaceBody
@@ -734,7 +800,7 @@ function ProjectWorkspaceBody({
   return (
     <div
           ref={containerRef}
-          className="flex min-h-0 w-full flex-1 flex-col border-t border-[var(--border)] bg-[var(--background)] md:h-[calc(100dvh-3.5rem)] md:flex-row md:overflow-hidden"
+          className="flex min-h-0 w-full flex-1 flex-col border-t border-[var(--border)] bg-[var(--card-bg)] md:min-h-0 md:flex-row md:overflow-hidden"
     >
         <div
           className="flex min-h-0 shrink-0 flex-col border-b border-[var(--border)] bg-[var(--card-bg)] transition-[width] duration-200 ease-out md:h-full md:border-b-0 md:border-r"
@@ -843,7 +909,11 @@ function ProjectWorkspaceBody({
             AI
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto p-3 text-sm text-[var(--muted)]">
+        <div
+          className={`min-h-0 flex-1 p-3 text-sm text-[var(--muted)] ${
+            inspectorTab === 'ai' ? 'flex flex-col overflow-hidden' : 'overflow-auto'
+          }`}
+        >
           {inspectorTab === 'inspector' ? (
             <InspectorPanel />
           ) : (

@@ -180,7 +180,7 @@ export default function RootLayout({
         />
         <title>sshwrite</title>
       </head>
-      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+      <body className="flex min-h-[100dvh] flex-col" suppressHydrationWarning>
         <HeaderBar />
         {children}
       </body>
