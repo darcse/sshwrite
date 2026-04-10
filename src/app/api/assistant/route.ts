@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 
 type ReqBody = {
   mode?: 'chat' | 'ideas' | 'polish' | 'continue' | 'summarize'
+  type?: 'novel' | 'lyrics'
   message?: string
   context?: string
   selection?: string
@@ -10,6 +11,9 @@ type ReqBody = {
 
 function buildPrompt(body: ReqBody) {
   if (body.mode === 'ideas') {
+    if (body.type === 'lyrics') {
+      return `다음 가사 내용을 바탕으로 주제/후렴/브릿지 전개 아이디어를 번호 목록으로 5개 제안해줘.\n\n가사:\n${body.context ?? ''}`
+    }
     return `다음 문서 내용을 바탕으로 씬/챕터 아이디어를 번호 목록으로 5개 제안해줘.\n\n문서:\n${body.context ?? ''}`
   }
   if (body.mode === 'polish') {
@@ -36,6 +40,10 @@ export async function POST(req: Request) {
 
     const body = (await req.json()) as ReqBody
     const prompt = buildPrompt(body)
+    const systemPrompt =
+      body.type === 'lyrics'
+        ? '당신은 전문 작사가입니다. 사용자의 가사 작성을 돕는 조언을 한국어로 제공해주세요. 운율, 라임, 멜로디 흐름을 고려해주세요.'
+        : '당신은 소설 편집자입니다. 사용자의 소설 집필을 돕는 조언을 한국어로 제공해주세요.'
     const key = process.env.ANTHROPIC_API_KEY
     if (!key) {
       return NextResponse.json({ error: 'API 키가 설정되지 않았습니다.' }, { status: 500 })
@@ -51,6 +59,7 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
+        system: systemPrompt,
         messages: [{ role: 'user', content: prompt }],
       }),
     })

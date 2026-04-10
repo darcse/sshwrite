@@ -24,6 +24,8 @@ export type CharacterRow = {
 export function CharacterPanel() {
   const { projectId, uploadCharacterImage } = useBinderContext()
   const [rows, setRows] = useState<CharacterRow[]>([])
+  const [projectType, setProjectType] = useState<'novel' | 'lyrics'>('novel')
+  const [typeLoading, setTypeLoading] = useState(true)
   const [loading, setLoading] = useState(true)
   const [openChar, setOpenChar] = useState(false)
   const [openPlace, setOpenPlace] = useState(false)
@@ -57,6 +59,26 @@ export function CharacterPanel() {
     void load()
   }, [load])
 
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      setTypeLoading(true)
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('write_projects')
+        .select('type')
+        .eq('id', projectId)
+        .maybeSingle()
+      if (!alive) return
+      const t = (data as { type?: string | null } | null)?.type
+      setProjectType(t === 'lyrics' ? 'lyrics' : 'novel')
+      setTypeLoading(false)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [projectId])
+
   const getRowType = useCallback(
     (row: CharacterRow) => (row.type ?? row.kind ?? 'character'),
     []
@@ -67,6 +89,8 @@ export function CharacterPanel() {
     [rows, getRowType]
   )
   const places = useMemo(() => rows.filter((r) => getRowType(r) === 'place'), [rows, getRowType])
+
+  if (typeLoading || projectType !== 'novel') return null
 
   return (
     <div className="mb-2 flex flex-col gap-1 border-b border-[var(--border)] pb-2">

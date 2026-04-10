@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 type ReqBody = {
   content?: unknown
   title?: string
+  type?: 'novel' | 'lyrics'
 }
 
 function tiptapToPlainText(raw: unknown): string {
@@ -40,6 +41,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'API 키가 설정되지 않았습니다.' }, { status: 500 })
     }
 
+    const systemPrompt =
+      body.type === 'lyrics'
+        ? '당신은 전문 작사가입니다. 주어진 가사의 주제와 감성을 2~3문장으로 요약해주세요.'
+        : '당신은 소설 편집자입니다. 주어진 챕터 내용을 2~3문장으로 간결하게 요약해주세요.'
+
     const userMessage = `제목: ${title || '(제목 없음)'}\n\n본문:\n${plain}`
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -52,7 +58,7 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 500,
-        system: '당신은 소설 편집자입니다. 주어진 챕터 내용을 2~3문장으로 간결하게 요약해주세요.',
+        system: systemPrompt,
         messages: [{ role: 'user', content: userMessage }],
       }),
     })

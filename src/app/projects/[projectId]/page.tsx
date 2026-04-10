@@ -275,7 +275,7 @@ function EditorPanel({ showInspectorMeta }: { showInspectorMeta: boolean }) {
   )
 }
 
-function InspectorPanel() {
+function InspectorPanel({ projectType }: { projectType: 'novel' | 'lyrics' }) {
   const { projectId, documents, labels, selectedDocId, updateDocument, refresh, loading } =
     useBinderContext()
   const [saving, setSaving] = useState(false)
@@ -417,7 +417,7 @@ function InspectorPanel() {
     if (!doc || doc.type !== 'document') return
     const plain = contentToText(doc.content)
     if (!plain.trim()) {
-      window.alert('문서 내용을 먼저 작성해주세요')
+      window.alert(projectType === 'lyrics' ? '가사 내용을 먼저 작성해주세요' : '문서 내용을 먼저 작성해주세요')
       return
     }
     setSynopsisGenerating(true)
@@ -425,7 +425,7 @@ function InspectorPanel() {
       const res = await fetch('/api/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: doc.content, title: doc.title }),
+        body: JSON.stringify({ content: doc.content, title: doc.title, type: projectType }),
       })
       const data = (await res.json()) as { text?: string; error?: string }
       if (!res.ok) {
@@ -616,6 +616,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [inspectorWidth, setInspectorWidth] = useState(DEFAULT_INSPECTOR)
   const [binderCollapsed, setBinderCollapsed] = useState(false)
   const [inspectorTab, setInspectorTab] = useState<'inspector' | 'ai'>('inspector')
+  const [projectType, setProjectType] = useState<'novel' | 'lyrics'>('novel')
   const [hydrated, setHydrated] = useState(false)
   const [desktop, setDesktop] = useState(false)
 
@@ -663,6 +664,24 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
     if (!hydrated) return
     saveStored(projectId, layoutRef.current)
   }, [projectId, binderCollapsed, hydrated])
+
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('write_projects')
+        .select('type')
+        .eq('id', projectId)
+        .maybeSingle()
+      if (!alive) return
+      const t = (data as { type?: string | null } | null)?.type
+      setProjectType(t === 'lyrics' ? 'lyrics' : 'novel')
+    })()
+    return () => {
+      alive = false
+    }
+  }, [projectId])
 
   const persistWidths = useCallback(() => {
     saveStored(projectId, layoutRef.current)
@@ -785,6 +804,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
         startDragInspector={startDragInspector}
         inspectorTab={inspectorTab}
         setInspectorTab={setInspectorTab}
+        projectType={projectType}
       />
     </BinderProvider>
   )
@@ -801,6 +821,7 @@ function ProjectWorkspaceBody({
   startDragInspector,
   inspectorTab,
   setInspectorTab,
+  projectType,
 }: {
   containerRef: RefObject<HTMLDivElement | null>
   binderColumnStyle: CSSProperties
@@ -812,6 +833,7 @@ function ProjectWorkspaceBody({
   startDragInspector: (e: React.MouseEvent) => void
   inspectorTab: 'inspector' | 'ai'
   setInspectorTab: (tab: 'inspector' | 'ai') => void
+  projectType: 'novel' | 'lyrics'
 }) {
   const { documents, selectedDocId } = useBinderContext()
   const selectedDoc = selectedDocId ? documents.find((d) => d.id === selectedDocId) : undefined
@@ -933,10 +955,14 @@ function ProjectWorkspaceBody({
             data-inspector-panel-content
             className={inspectorTab === 'inspector' ? 'h-full overflow-auto' : 'hidden'}
           >
-            <InspectorPanel />
+            <InspectorPanel projectType={projectType} />
           </div>
           <div className={inspectorTab === 'ai' ? 'flex h-full min-h-0 flex-col overflow-hidden' : 'hidden'}>
-            <AssistantPanel documentId={selectedDocId ?? null} documentText={selectedDocText} />
+            <AssistantPanel
+              documentId={selectedDocId ?? null}
+              documentText={selectedDocText}
+              projectType={projectType}
+            />
           </div>
         </div>
       </aside>

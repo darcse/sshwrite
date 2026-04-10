@@ -14,7 +14,7 @@ type ProjectStats = {
 }
 
 type ProjectCardProps = {
-  project: ProjectModalProject & { place_image_url?: string | null; stats?: ProjectStats }
+  project: ProjectModalProject & { cover_image_url?: string | null; stats?: ProjectStats }
   deleting: boolean
   onEdit: () => void
   onDelete: () => void
@@ -33,7 +33,7 @@ function formatUpdatedAt(iso: string | null | undefined) {
 
 export function ProjectCard({ project, deleting, onEdit, onDelete }: ProjectCardProps) {
   const coverColor = project.cover_color?.trim()
-  const coverImage = project.place_image_url
+  const coverImage = project.cover_image_url
   const updatedLabel = formatUpdatedAt(project.updated_at)
   const onCover = Boolean(coverColor || coverImage)
   const stats = project.stats ?? {

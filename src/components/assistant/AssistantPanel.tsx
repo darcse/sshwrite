@@ -11,9 +11,11 @@ type ChatMessage = {
 export function AssistantPanel({
   documentId,
   documentText,
+  projectType,
 }: {
   documentId: string | null
   documentText: string
+  projectType: 'novel' | 'lyrics'
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -53,6 +55,7 @@ export function AssistantPanel({
         mode: 'chat',
         message: text,
         context: documentText,
+        type: projectType,
       })
       setMessages((prev) => [...prev, { role: 'assistant', text: reply || '응답이 비어 있습니다.' }])
     } catch (e) {
@@ -65,19 +68,30 @@ export function AssistantPanel({
   async function suggestIdeas() {
     if (loading) return
     if (!documentText.trim()) {
-      setError('문서 내용이 없어서 아이디어를 제안할 수 없습니다.')
+      setError(
+        projectType === 'lyrics'
+          ? '가사 내용이 없어서 아이디어를 제안할 수 없습니다.'
+          : '문서 내용이 없어서 아이디어를 제안할 수 없습니다.'
+      )
       return
     }
     setError('')
     setLoading(true)
     setMessages((prev) => [
       ...prev,
-      { role: 'user', text: '현재 문서 기준으로 아이디어를 제안해줘.' },
+      {
+        role: 'user',
+        text:
+          projectType === 'lyrics'
+            ? '현재 가사 기준으로 아이디어를 제안해줘.'
+            : '현재 문서 기준으로 아이디어를 제안해줘.',
+      },
     ])
     try {
       const reply = await callAssistant({
         mode: 'ideas',
         context: documentText,
+        type: projectType,
       })
       setMessages((prev) => [...prev, { role: 'assistant', text: reply || '아이디어를 생성하지 못했습니다.' }])
     } catch (e) {
@@ -97,9 +111,9 @@ export function AssistantPanel({
         style={{ backgroundColor: 'var(--badge-bg)', color: 'var(--foreground)' }}
       >
         <Sparkles className="h-3.5 w-3.5" aria-hidden />
-        아이디어 제안
+        {projectType === 'lyrics' ? '가사 아이디어 제안' : '아이디어 제안'}
       </button>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto rounded border border-[var(--border)] bg-[var(--card-bg)] p-2">
+      <div className="h-[420px] max-h-[52vh] min-w-0 shrink-0 overflow-y-auto rounded border border-[var(--border)] bg-[var(--card-bg)] p-2">
         <div className="flex min-h-0 flex-col gap-2">
           {messages.map((m, i) => (
             <div
