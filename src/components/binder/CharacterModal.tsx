@@ -2,7 +2,7 @@
 
 import type { CharacterRow } from '@/components/binder/CharacterPanel'
 import { createClient } from '@/lib/supabase/client'
-import { X } from 'lucide-react'
+import { Loader2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 type CharacterModalProps = {
@@ -36,8 +36,16 @@ export function CharacterModal({
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [imageUrlInput, setImageUrlInput] = useState('')
   const [saving, setSaving] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiSuggestions, setAiSuggestions] = useState<{ name: string; description: string }[] | null>(
+    null
+  )
+  const [aiError, setAiError] = useState<string | null>(null)
 
   useEffect(() => {
+    setAiSuggestions(null)
+    setAiError(null)
+    setAiLoading(false)
     if (initialRow) {
       setName(initialRow.name)
       setDescription(initialRow.description ?? '')
@@ -158,6 +166,54 @@ export function CharacterModal({
     onClose()
   }
 
+  async function handleAiGenerate() {
+    setAiLoading(true)
+    setAiError(null)
+    setAiSuggestions(null)
+    try {
+      const res = await fetch('/api/generate-character', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind }),
+      })
+      const data = (await res.json()) as { suggestions?: unknown; error?: string }
+      if (!res.ok) {
+        setAiError(data.error || '요청에 실패했습니다.')
+        return
+      }
+      const list = data.suggestions
+      if (!Array.isArray(list) || list.length === 0) {
+        setAiError('제안을 가져오지 못했습니다.')
+        return
+      }
+      const normalized: { name: string; description: string }[] = []
+      for (const item of list) {
+        if (!item || typeof item !== 'object') continue
+        const o = item as Record<string, unknown>
+        const n = typeof o.name === 'string' ? o.name.trim() : ''
+        const d = typeof o.description === 'string' ? o.description.trim() : ''
+        if (n) normalized.push({ name: n, description: d })
+        if (normalized.length >= 3) break
+      }
+      if (normalized.length === 0) {
+        setAiError('제안을 가져오지 못했습니다.')
+        return
+      }
+      setAiSuggestions(normalized)
+    } catch {
+      setAiError('요청 처리 중 오류가 발생했습니다.')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  function applySuggestion(s: { name: string; description: string }) {
+    setName(s.name)
+    setDescription(s.description)
+    setAiSuggestions(null)
+    setAiError(null)
+  }
+
   return (
     <div
       className="fixed inset-0 z-[400] flex items-center justify-center p-4 modal-overlay-apple"
@@ -186,8 +242,21 @@ export function CharacterModal({
           </button>
         </div>
         <div className="flex flex-col gap-4 text-sm">
-          <label className="flex flex-col gap-1">
-            <span className="text-[var(--muted)]">이름</span>
+          <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[var(--muted)]">이름</span>
+              <button
+                type="button"
+                className="btn-apple btn-apple-secondary inline-flex items-center gap-1.5 px-2 py-1 text-xs"
+                disabled={saving || aiLoading}
+                onClick={() => void handleAiGenerate()}
+              >
+                {aiLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
+                ) : null}
+                AI 생성
+              </button>
+            </div>
             <input
               type="text"
               value={name}
@@ -195,7 +264,33 @@ export function CharacterModal({
               required
               className="input-apple px-2 py-1.5"
             />
-          </label>
+            {aiError ? (
+              <p className="text-xs text-red-500" role="alert">
+                {aiError}
+              </p>
+            ) : null}
+            {aiSuggestions && aiSuggestions.length > 0 ? (
+              <ul
+                className="mt-1 flex flex-col gap-1 rounded border border-[var(--border)] p-1"
+                role="listbox"
+              >
+                {aiSuggestions.map((s, i) => (
+                  <li key={`${s.name}-${i}`}>
+                    <button
+                      type="button"
+                      className="w-full rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-[var(--badge-bg)]"
+                      onClick={() => applySuggestion(s)}
+                    >
+                      <span className="font-medium text-[var(--foreground)]">{s.name}</span>
+                      {s.description ? (
+                        <span className="mt-0.5 block text-[var(--muted)]">{s.description}</span>
+                      ) : null}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
           <label className="flex flex-col gap-1">
             <span className="text-[var(--muted)]">설명</span>
             <input
