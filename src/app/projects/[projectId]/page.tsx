@@ -8,6 +8,7 @@ import { SnapshotPanel } from '@/components/editor/SnapshotPanel'
 import { CompileModal } from '@/components/editor/CompileModal'
 import { ReadingMode } from '@/components/editor/ReadingMode'
 import { ScratchpadPanel } from '@/components/editor/ScratchpadPanel'
+import { StatsModal } from '@/components/editor/StatsModal'
 import { PomodoroTimer } from '@/components/ui/PomodoroTimer'
 import { createClient } from '@/lib/supabase/client'
 import { tiptapToPlainText } from '@/lib/doc-utils'
@@ -21,6 +22,7 @@ import {
   FolderPlus,
   Loader2,
   PenLine,
+  ChartColumn,
   Search,
   Shrink,
   X,
@@ -854,15 +856,28 @@ function ProjectWorkspaceBody({
   setInspectorTab: (tab: 'inspector' | 'ai') => void
 }) {
   const { documents, selectedDocId, projectTitle } = useBinderContext()
+  const [statsOpen, setStatsOpen] = useState(false)
   const selectedDoc = selectedDocId ? documents.find((d) => d.id === selectedDocId) : undefined
   const selectedDocText = selectedDoc?.type === 'document' ? tiptapToPlainText(selectedDoc.content) : ''
   return (
+    <>
     <div className="flex min-h-0 w-full flex-1 flex-col border-t border-[var(--border)] bg-[var(--card-bg)]">
       <div className="flex h-12 w-full shrink-0 items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--card-bg)] px-4">
         <span className="min-w-0 flex-1 truncate text-lg font-semibold leading-tight text-[var(--foreground)]">
           {projectTitle || '프로젝트'}
         </span>
-        <ScratchpadPanel projectId={projectId} />
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setStatsOpen(true)}
+            className="shrink-0 rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
+            aria-label="집필 통계"
+            title="집필 통계"
+          >
+            <ChartColumn className="h-5 w-5" strokeWidth={2} aria-hidden />
+          </button>
+          <ScratchpadPanel projectId={projectId} />
+        </div>
       </div>
       <div
         ref={containerRef}
@@ -992,6 +1007,8 @@ function ProjectWorkspaceBody({
       </aside>
       </div>
     </div>
+    <StatsModal projectId={projectId} open={statsOpen} onClose={() => setStatsOpen(false)} />
+    </>
   )
 }
 
