@@ -87,12 +87,17 @@ export function PomodoroTimer() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 rounded px-2 py-1 text-sm"
+        className="inline-flex shrink-0 items-center gap-1 rounded p-1 text-sm"
         style={{ color: running ? accentColor : 'var(--muted)' }}
         aria-label="포모도로 타이머"
+        title="포모도로 타이머"
       >
-        {running ? <span className="tabular-nums">{timeText}</span> : null}
-        {running ? <Pause className="h-4 w-4" strokeWidth={2} aria-hidden /> : <Timer className="h-4 w-4" strokeWidth={2} aria-hidden />}
+        {running ? <span className="tabular-nums text-xs">{timeText}</span> : null}
+        {running ? (
+          <Pause className="h-5 w-5" strokeWidth={2} aria-hidden />
+        ) : (
+          <Timer className="h-5 w-5" strokeWidth={2} aria-hidden />
+        )}
       </button>
 
       {open ? (

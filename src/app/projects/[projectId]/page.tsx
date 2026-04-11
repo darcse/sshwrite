@@ -4,6 +4,7 @@ import { BinderProvider, BinderTree, useBinderContext } from '@/components/binde
 import { AssistantPanel } from '@/components/assistant/AssistantPanel'
 import { Corkboard } from '@/components/corkboard/Corkboard'
 import { Editor } from '@/components/editor/Editor'
+import { SnapshotPanel } from '@/components/editor/SnapshotPanel'
 import { CompileModal } from '@/components/editor/CompileModal'
 import { ReadingMode } from '@/components/editor/ReadingMode'
 import { PomodoroTimer } from '@/components/ui/PomodoroTimer'
@@ -19,6 +20,7 @@ import {
   FolderPlus,
   Loader2,
   PenLine,
+  Search,
   Shrink,
   X,
 } from 'lucide-react'
@@ -186,6 +188,12 @@ function EditorPanel({ showInspectorMeta }: { showInspectorMeta: boolean }) {
   const [focusMode, setFocusMode] = useState(false)
   const [readingOpen, setReadingOpen] = useState(false)
   const [compileOpen, setCompileOpen] = useState(false)
+  const [findReplaceOpen, setFindReplaceOpen] = useState(false)
+
+  useEffect(() => {
+    setFindReplaceOpen(false)
+  }, [selectedDocId])
+
   return (
     <>
       <CompileModal open={compileOpen} onClose={() => setCompileOpen(false)} />
@@ -193,6 +201,17 @@ function EditorPanel({ showInspectorMeta }: { showInspectorMeta: boolean }) {
       <div className="flex h-12 min-w-0 shrink-0 items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--card-bg)] px-3 text-sm font-medium text-[var(--foreground)]">
         <span className="min-w-0 flex-1 truncate">{doc ? doc.title : '문서를 선택하세요'}</span>
         <div className="flex items-center gap-1">
+          {doc?.type === 'document' ? (
+            <button
+              type="button"
+              className="shrink-0 rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
+              onClick={() => setFindReplaceOpen((v) => !v)}
+              aria-label="찾기 및 바꾸기"
+              title="찾기 및 바꾸기 (Ctrl+H)"
+            >
+              <Search className="h-5 w-5" strokeWidth={2} aria-hidden />
+            </button>
+          ) : null}
           <PomodoroTimer />
           <button
             type="button"
@@ -257,6 +276,8 @@ function EditorPanel({ showInspectorMeta }: { showInspectorMeta: boolean }) {
             showInspectorMeta={showInspectorMeta}
             focusMode={focusMode}
             onFocusModeChange={setFocusMode}
+            findReplaceOpen={findReplaceOpen}
+            onFindReplaceOpenChange={setFindReplaceOpen}
           />
         )}
       </div>
@@ -586,6 +607,10 @@ function InspectorPanel({ projectType }: { projectType: 'novel' | 'lyrics' }) {
             <span className="text-[var(--foreground)]">{selectedLabel.name}</span>
           </div>
         ) : null}
+      </div>
+      <div className="flex flex-col gap-2 text-sm">
+        <span className="text-[var(--muted)]">스냅샷</span>
+        <SnapshotPanel documentId={doc.id} />
       </div>
       <label className="mb-6 flex flex-col gap-1 text-sm">
         <span className="text-[var(--muted)]">메모</span>

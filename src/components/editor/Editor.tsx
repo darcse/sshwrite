@@ -2,10 +2,14 @@
 
 import { useEditor, EditorContent } from '@tiptap/react'
 import type { Editor as TiptapEditor } from '@tiptap/core'
+import { Extension } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
+import { search } from 'prosemirror-search'
 import { createClient } from '@/lib/supabase/client'
 import { useBinderContext } from '@/components/binder/BinderTree'
 import { EditorToolbar } from '@/components/editor/EditorToolbar'
+import { FindReplacePanel } from '@/components/editor/FindReplacePanel'
+import { registerSnapshotBridge } from '@/components/editor/SnapshotPanel'
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -28,6 +32,13 @@ function normalizeContent(raw: unknown) {
   return { type: 'doc', content: [] }
 }
 
+const findReplacePmExtension = Extension.create({
+  name: 'findReplacePm',
+  addProseMirrorPlugins() {
+    return [search()]
+  },
+})
+
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
 export function Editor({
@@ -38,6 +49,8 @@ export function Editor({
   showInspectorMeta,
   focusMode,
   onFocusModeChange,
+  findReplaceOpen: findReplaceOpenProp,
+  onFindReplaceOpenChange,
 }: {
   documentId: string
   initialContent: unknown
@@ -46,6 +59,8 @@ export function Editor({
   showInspectorMeta: boolean
   focusMode: boolean
   onFocusModeChange: (v: boolean) => void
+  findReplaceOpen?: boolean
+  onFindReplaceOpenChange?: (open: boolean) => void
 }) {
   const { refresh } = useBinderContext()
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
@@ -58,6 +73,14 @@ export function Editor({
     top: number
     left: number
   }>({ visible: false, top: 0, left: 0 })
+  const [findReplaceOpenInternal, setFindReplaceOpenInternal] = useState(false)
+  const findReplaceControlled = typeof onFindReplaceOpenChange === 'function'
+  const findReplaceOpen = findReplaceControlled
+    ? (findReplaceOpenProp ?? false)
+    : findReplaceOpenInternal
+  const setFindReplaceOpen = findReplaceControlled
+    ? onFindReplaceOpenChange!
+    : setFindReplaceOpenInternal
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedClearRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastPersistedJson = useRef<string>('')
@@ -138,6 +161,7 @@ export function Editor({
             levels: [1, 2, 3],
           },
         }),
+        findReplacePmExtension,
       ],
       content: normalizeContent(initialContent),
       immediatelyRender: false,
@@ -155,6 +179,22 @@ export function Editor({
   useEffect(() => {
     editorRef.current = editor
   }, [editor])
+
+  useEffect(() => {
+    registerSnapshotBridge(editor ?? null, editor ? flushSave : null)
+    return () => registerSnapshotBridge(null, null)
+  }, [editor, flushSave])
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'h') {
+        e.preventDefault()
+        setFindReplaceOpen(!findReplaceOpen)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [findReplaceOpen, setFindReplaceOpen])
 
   useEffect(() => {
     if (!editor) return
@@ -351,15 +391,18 @@ export function Editor({
       }
       style={{ backgroundColor: 'var(--card-bg)' }}
     >
-      <style>{`.ProseMirror { outline: none !important; border: none !important; }`}</style>
-      <div
-        className="min-h-0 flex-1 overflow-y-auto"
-        style={{
-          backgroundColor: 'var(--card-bg)',
-          color: 'var(--foreground)',
-        }}
-      >
-        <div className="min-h-full w-full" style={{ 
+      <style>{`.ProseMirror { outline: none !important; border: none !important; }
+.ProseMirror-search-match { background-color: #ffff0054; }
+.ProseMirror-active-search-match { background-color: #ff6a0054; }`}</style>
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        <div
+          className="min-h-0 h-full overflow-y-auto"
+          style={{
+            backgroundColor: 'var(--card-bg)',
+            color: 'var(--foreground)',
+          }}
+        >
+          <div className="min-h-full w-full" style={{ 
   paddingLeft: 0, 
   paddingRight: 0,
   backgroundColor: 'var(--card-bg)',
@@ -415,6 +458,12 @@ export function Editor({
             <EditorContent editor={editor} />
           </div>
         </div>
+        </div>
+        <FindReplacePanel
+          editor={editor}
+          open={findReplaceOpen}
+          onClose={() => setFindReplaceOpen(false)}
+        />
       </div>
       {showInspectorMeta && inspectorMount
         ? createPortal(
