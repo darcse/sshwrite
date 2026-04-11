@@ -8,6 +8,7 @@ import { SnapshotPanel } from '@/components/editor/SnapshotPanel'
 import { CompileModal } from '@/components/editor/CompileModal'
 import { ReadingMode } from '@/components/editor/ReadingMode'
 import { ScratchpadPanel } from '@/components/editor/ScratchpadPanel'
+import { CommandPalette } from '@/components/editor/CommandPalette'
 import { StatsModal } from '@/components/editor/StatsModal'
 import { PomodoroTimer } from '@/components/ui/PomodoroTimer'
 import { createClient } from '@/lib/supabase/client'
@@ -857,6 +858,18 @@ function ProjectWorkspaceBody({
 }) {
   const { documents, selectedDocId, projectTitle } = useBinderContext()
   const [statsOpen, setStatsOpen] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setPaletteOpen((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
   const selectedDoc = selectedDocId ? documents.find((d) => d.id === selectedDocId) : undefined
   const selectedDocText = selectedDoc?.type === 'document' ? tiptapToPlainText(selectedDoc.content) : ''
   return (
@@ -867,6 +880,15 @@ function ProjectWorkspaceBody({
           {projectTitle || '프로젝트'}
         </span>
         <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            className="shrink-0 rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
+            aria-label="문서 검색"
+            title="문서 검색 (⌘K)"
+          >
+            <Search className="h-5 w-5" strokeWidth={2} aria-hidden />
+          </button>
           <button
             type="button"
             onClick={() => setStatsOpen(true)}
@@ -1008,6 +1030,7 @@ function ProjectWorkspaceBody({
       </div>
     </div>
     <StatsModal projectId={projectId} open={statsOpen} onClose={() => setStatsOpen(false)} />
+    <CommandPalette projectId={projectId} open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </>
   )
 }
