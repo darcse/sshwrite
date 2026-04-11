@@ -7,6 +7,7 @@ import { Editor } from '@/components/editor/Editor'
 import { SnapshotPanel } from '@/components/editor/SnapshotPanel'
 import { CompileModal } from '@/components/editor/CompileModal'
 import { ReadingMode } from '@/components/editor/ReadingMode'
+import { ScratchpadPanel } from '@/components/editor/ScratchpadPanel'
 import { PomodoroTimer } from '@/components/ui/PomodoroTimer'
 import { createClient } from '@/lib/supabase/client'
 import { tiptapToPlainText } from '@/lib/doc-utils'
@@ -285,9 +286,17 @@ function EditorPanel({ showInspectorMeta }: { showInspectorMeta: boolean }) {
   )
 }
 
-function InspectorPanel({ projectType }: { projectType: 'novel' | 'lyrics' }) {
-  const { projectId, documents, labels, selectedDocId, updateDocument, refresh, loading } =
-    useBinderContext()
+function InspectorPanel() {
+  const {
+    projectId,
+    projectType,
+    documents,
+    labels,
+    selectedDocId,
+    updateDocument,
+    refresh,
+    loading,
+  } = useBinderContext()
   const [saving, setSaving] = useState(false)
   const [labelColor, setLabelColor] = useState(LABEL_COLORS[0])
   const [labelName, setLabelName] = useState('')
@@ -644,7 +653,6 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [inspectorWidth, setInspectorWidth] = useState(DEFAULT_INSPECTOR)
   const [binderCollapsed, setBinderCollapsed] = useState(false)
   const [inspectorTab, setInspectorTab] = useState<'inspector' | 'ai'>('inspector')
-  const [projectType, setProjectType] = useState<'novel' | 'lyrics'>('novel')
   const [hydrated, setHydrated] = useState(false)
   const [desktop, setDesktop] = useState(false)
 
@@ -692,24 +700,6 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
     if (!hydrated) return
     saveStored(projectId, layoutRef.current)
   }, [projectId, binderCollapsed, hydrated])
-
-  useEffect(() => {
-    let alive = true
-    void (async () => {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('write_projects')
-        .select('type')
-        .eq('id', projectId)
-        .maybeSingle()
-      if (!alive) return
-      const t = (data as { type?: string | null } | null)?.type
-      setProjectType(t === 'lyrics' ? 'lyrics' : 'novel')
-    })()
-    return () => {
-      alive = false
-    }
-  }, [projectId])
 
   const persistWidths = useCallback(() => {
     saveStored(projectId, layoutRef.current)
@@ -822,6 +812,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   return (
     <BinderProvider projectId={projectId} uploadCharacterImage={uploadCharacterImage}>
       <ProjectWorkspaceBody
+        projectId={projectId}
         containerRef={containerRef}
         binderColumnStyle={binderColumnStyle}
         inspectorStyle={inspectorStyle}
@@ -832,13 +823,13 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
         startDragInspector={startDragInspector}
         inspectorTab={inspectorTab}
         setInspectorTab={setInspectorTab}
-        projectType={projectType}
       />
     </BinderProvider>
   )
 }
 
 function ProjectWorkspaceBody({
+  projectId,
   containerRef,
   binderColumnStyle,
   inspectorStyle,
@@ -849,8 +840,8 @@ function ProjectWorkspaceBody({
   startDragInspector,
   inspectorTab,
   setInspectorTab,
-  projectType,
 }: {
+  projectId: string
   containerRef: RefObject<HTMLDivElement | null>
   binderColumnStyle: CSSProperties
   inspectorStyle: CSSProperties
@@ -861,16 +852,22 @@ function ProjectWorkspaceBody({
   startDragInspector: (e: React.MouseEvent) => void
   inspectorTab: 'inspector' | 'ai'
   setInspectorTab: (tab: 'inspector' | 'ai') => void
-  projectType: 'novel' | 'lyrics'
 }) {
-  const { documents, selectedDocId } = useBinderContext()
+  const { documents, selectedDocId, projectTitle } = useBinderContext()
   const selectedDoc = selectedDocId ? documents.find((d) => d.id === selectedDocId) : undefined
   const selectedDocText = selectedDoc?.type === 'document' ? tiptapToPlainText(selectedDoc.content) : ''
   return (
-    <div
-          ref={containerRef}
-          className="flex min-h-0 w-full flex-1 flex-col border-t border-[var(--border)] bg-[var(--card-bg)] md:min-h-0 md:flex-row md:overflow-hidden"
-    >
+    <div className="flex min-h-0 w-full flex-1 flex-col border-t border-[var(--border)] bg-[var(--card-bg)]">
+      <div className="flex h-12 w-full shrink-0 items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--card-bg)] px-4">
+        <span className="min-w-0 flex-1 truncate text-lg font-semibold leading-tight text-[var(--foreground)]">
+          {projectTitle || '프로젝트'}
+        </span>
+        <ScratchpadPanel projectId={projectId} />
+      </div>
+      <div
+        ref={containerRef}
+        className="flex min-h-0 w-full flex-1 flex-col md:flex-row md:overflow-hidden"
+      >
         <div
           className="flex min-h-0 shrink-0 flex-col border-b border-[var(--border)] bg-[var(--card-bg)] transition-[width] duration-200 ease-out md:h-full md:border-b-0 md:border-r"
           style={binderColumnStyle}
@@ -983,17 +980,17 @@ function ProjectWorkspaceBody({
             data-inspector-panel-content
             className={inspectorTab === 'inspector' ? 'h-full overflow-auto' : 'hidden'}
           >
-            <InspectorPanel projectType={projectType} />
+            <InspectorPanel />
           </div>
           <div className={inspectorTab === 'ai' ? 'flex h-full min-h-0 flex-col overflow-hidden' : 'hidden'}>
             <AssistantPanel
               documentId={selectedDocId ?? null}
               documentText={selectedDocText}
-              projectType={projectType}
             />
           </div>
         </div>
       </aside>
+      </div>
     </div>
   )
 }

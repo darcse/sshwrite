@@ -1,5 +1,6 @@
 'use client'
 
+import { useBinderContext } from '@/components/binder/BinderTree'
 import { Loader2, Send, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -11,12 +12,11 @@ type ChatMessage = {
 export function AssistantPanel({
   documentId,
   documentText,
-  projectType,
 }: {
   documentId: string | null
   documentText: string
-  projectType: 'novel' | 'lyrics'
 }) {
+  const { projectType } = useBinderContext()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)

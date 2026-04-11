@@ -67,6 +67,8 @@ export type DragOverInfo = {
 
 type BinderContextValue = {
   projectId: string
+  projectTitle: string
+  projectType: 'novel' | 'lyrics'
   documents: DocRow[]
   labels: LabelRow[]
   loading: boolean
@@ -178,6 +180,8 @@ export function BinderProvider({
 
   const [documents, setDocuments] = useState<DocRow[]>([])
   const [labels, setLabels] = useState<LabelRow[]>([])
+  const [projectTitle, setProjectTitle] = useState('')
+  const [projectType, setProjectType] = useState<'novel' | 'lyrics'>('novel')
   const [loading, setLoading] = useState(true)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [dragOverInfo, setDragOverInfo] = useState<DragOverInfo>(null)
@@ -191,10 +195,12 @@ export function BinderProvider({
     if (!user) {
       setDocuments([])
       setLabels([])
+      setProjectTitle('')
+      setProjectType('novel')
       setLoading(false)
       return
     }
-    const [docRes, labelRes] = await Promise.all([
+    const [docRes, labelRes, projRes] = await Promise.all([
       supabase
         .from('write_documents')
         .select('*')
@@ -206,12 +212,28 @@ export function BinderProvider({
         .select('*')
         .eq('project_id', projectId)
         .order('name', { ascending: true }),
+      supabase
+        .from('write_projects')
+        .select('title, type')
+        .eq('id', projectId)
+        .eq('user_id', user.id)
+        .maybeSingle(),
     ])
     setLoading(false)
     if (docRes.data) setDocuments(docRes.data as DocRow[])
     else setDocuments([])
     if (labelRes.data) setLabels(labelRes.data as LabelRow[])
     else setLabels([])
+    if (projRes.error) console.error(projRes.error)
+    const prow = projRes.data as { title?: string | null; type?: string | null } | null
+    if (prow) {
+      const tit = prow.title
+      setProjectTitle(typeof tit === 'string' ? tit.trim() : '')
+      setProjectType(prow.type === 'lyrics' ? 'lyrics' : 'novel')
+    } else {
+      setProjectTitle('')
+      setProjectType('novel')
+    }
   }, [projectId])
 
   useEffect(() => {
@@ -492,6 +514,8 @@ export function BinderProvider({
 
   const value: BinderContextValue = {
     projectId,
+    projectTitle,
+    projectType,
     documents,
     labels,
     loading,
