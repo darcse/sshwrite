@@ -202,6 +202,7 @@ function EditorPanel({ showInspectorMeta }: { showInspectorMeta: boolean }) {
     <>
       <CompileModal open={compileOpen} onClose={() => setCompileOpen(false)} />
       <ReadingMode open={readingOpen} onClose={() => setReadingOpen(false)} />
+      <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden">
       <div className="flex h-12 min-w-0 shrink-0 items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--card-bg)] px-3 text-sm font-medium text-[var(--foreground)]">
         <span className="min-w-0 flex-1 truncate">{doc ? doc.title : '문서를 선택하세요'}</span>
         <div className="flex items-center gap-1">
@@ -251,7 +252,7 @@ function EditorPanel({ showInspectorMeta }: { showInspectorMeta: boolean }) {
         </div>
       </div>
       <div
-        className="flex min-h-0 flex-1 flex-col overflow-hidden p-4"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4"
         style={{
           backgroundColor: 'var(--card-bg)',
         }}
@@ -271,19 +272,22 @@ function EditorPanel({ showInspectorMeta }: { showInspectorMeta: boolean }) {
             />
           </div>
         ) : (
-          <Editor
-            key={doc.id}
-            documentId={doc.id}
-            initialContent={doc.content}
-            createdAt={doc.created_at ?? null}
-            updatedAt={doc.updated_at ?? null}
-            showInspectorMeta={showInspectorMeta}
-            focusMode={focusMode}
-            onFocusModeChange={setFocusMode}
-            findReplaceOpen={findReplaceOpen}
-            onFindReplaceOpenChange={setFindReplaceOpen}
-          />
+          <div className="w-full shrink-0">
+            <Editor
+              key={doc.id}
+              documentId={doc.id}
+              initialContent={doc.content}
+              createdAt={doc.created_at ?? null}
+              updatedAt={doc.updated_at ?? null}
+              showInspectorMeta={showInspectorMeta}
+              focusMode={focusMode}
+              onFocusModeChange={setFocusMode}
+              findReplaceOpen={findReplaceOpen}
+              onFindReplaceOpenChange={setFindReplaceOpen}
+            />
+          </div>
         )}
+      </div>
       </div>
     </>
   )
@@ -802,10 +806,10 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   if (!workspaceReady) {
     return (
       <div
-        className="flex min-h-0 flex-1 flex-col border-t border-[var(--border)] bg-[var(--card-bg)]"
+        className="flex h-full min-h-0 flex-1 flex-col overflow-hidden border-t border-[var(--border)] bg-[var(--card-bg)]"
         aria-busy
       >
-        <div className="flex min-h-[40vh] flex-1 items-center justify-center text-sm text-[var(--muted)] md:min-h-0">
+        <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-[var(--muted)]">
           불러오는 중…
         </div>
       </div>
@@ -814,6 +818,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
 
   return (
     <BinderProvider projectId={projectId} uploadCharacterImage={uploadCharacterImage}>
+      <div className="flex h-full min-h-0 w-full flex-col">
       <ProjectWorkspaceBody
         projectId={projectId}
         containerRef={containerRef}
@@ -827,6 +832,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
         inspectorTab={inspectorTab}
         setInspectorTab={setInspectorTab}
       />
+      </div>
     </BinderProvider>
   )
 }
@@ -874,7 +880,7 @@ function ProjectWorkspaceBody({
   const selectedDocText = selectedDoc?.type === 'document' ? tiptapToPlainText(selectedDoc.content) : ''
   return (
     <>
-    <div className="flex min-h-0 w-full flex-1 flex-col border-t border-[var(--border)] bg-[var(--card-bg)]">
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden border-t border-[var(--border)] bg-[var(--card-bg)]">
       <div className="flex h-12 w-full shrink-0 items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--card-bg)] px-4">
         <span className="min-w-0 flex-1 truncate text-lg font-semibold leading-tight text-[var(--foreground)]">
           {projectTitle || '프로젝트'}
@@ -903,7 +909,7 @@ function ProjectWorkspaceBody({
       </div>
       <div
         ref={containerRef}
-        className="flex min-h-0 w-full flex-1 flex-col md:flex-row md:overflow-hidden"
+        className="flex h-full min-h-0 w-full flex-1 flex-col md:flex-row md:overflow-hidden"
       >
         <div
           className="flex min-h-0 shrink-0 flex-col border-b border-[var(--border)] bg-[var(--card-bg)] transition-[width] duration-200 ease-out md:h-full md:border-b-0 md:border-r"
@@ -963,7 +969,7 @@ function ProjectWorkspaceBody({
         />
 
         <main
-          className="flex min-h-[40vh] min-w-0 flex-1 flex-col overflow-hidden border-b border-[var(--border)] md:min-h-0 md:border-b-0"
+          className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-b border-[var(--border)] md:border-b-0"
           data-panel="editor"
         >
           <EditorPanel showInspectorMeta={inspectorTab === 'inspector'} />
@@ -1039,8 +1045,10 @@ function ProjectPageInner() {
   const params = useParams()
   const projectId = params.projectId as string
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <ProjectWorkspace projectId={projectId} />
+    <div className="flex h-[calc(100dvh-3rem)] min-h-0 w-full flex-col overflow-hidden">
+      <div className="flex h-0 min-h-0 flex-1 flex-col">
+        <ProjectWorkspace projectId={projectId} />
+      </div>
     </div>
   )
 }
@@ -1049,7 +1057,7 @@ export default function ProjectPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex flex-1 items-center justify-center p-8 text-sm text-[var(--muted)]">
+        <div className="flex h-[calc(100dvh-3rem)] shrink-0 items-center justify-center p-8 text-sm text-[var(--muted)]">
           불러오는 중…
         </div>
       }
