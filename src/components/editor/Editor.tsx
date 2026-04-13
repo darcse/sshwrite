@@ -13,6 +13,7 @@ import { FindReplacePanel } from '@/components/editor/FindReplacePanel'
 import { registerSnapshotBridge } from '@/components/editor/SnapshotPanel'
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { X } from 'lucide-react'
 
 function countWords(text: string) {
   const t = text.trim()
@@ -395,6 +396,17 @@ export function Editor({
       }
       style={{ backgroundColor: 'var(--card-bg)' }}
     >
+      {focusMode ? (
+        <button
+          type="button"
+          className="absolute right-3 top-0.5 z-[310] rounded-md p-2 text-[var(--muted)] transition-colors hover:bg-[var(--badge-bg)] hover:text-[var(--foreground)]"
+          aria-label="포커스 모드 닫기"
+          title="닫기"
+          onClick={() => onFocusModeChange(false)}
+        >
+          <X className="h-5 w-5" strokeWidth={2} aria-hidden />
+        </button>
+      ) : null}
       <style>{`.ProseMirror { outline: none !important; border: none !important; }
 .ProseMirror-search-match { background-color: #ffff0054; }
 .ProseMirror-active-search-match { background-color: #ff6a0054; }`}</style>
