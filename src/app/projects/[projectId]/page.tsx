@@ -9,6 +9,7 @@ import { CompileModal } from '@/components/editor/CompileModal'
 import { ReadingMode } from '@/components/editor/ReadingMode'
 import { ScratchpadPanel } from '@/components/editor/ScratchpadPanel'
 import { CommandPalette } from '@/components/editor/CommandPalette'
+import { KanbanBoard } from '@/components/editor/KanbanBoard'
 import { StatsModal } from '@/components/editor/StatsModal'
 import { PomodoroTimer } from '@/components/ui/PomodoroTimer'
 import { createClient } from '@/lib/supabase/client'
@@ -21,6 +22,7 @@ import {
   FileOutput,
   FilePlus,
   FolderPlus,
+  LayoutGrid,
   Loader2,
   PenLine,
   ChartColumn,
@@ -862,9 +864,10 @@ function ProjectWorkspaceBody({
   inspectorTab: 'inspector' | 'ai'
   setInspectorTab: (tab: 'inspector' | 'ai') => void
 }) {
-  const { documents, selectedDocId, projectTitle } = useBinderContext()
+  const { documents, selectedDocId, projectTitle, projectType } = useBinderContext()
   const [statsOpen, setStatsOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [kanbanOpen, setKanbanOpen] = useState(false)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -895,6 +898,17 @@ function ProjectWorkspaceBody({
           >
             <Search className="h-5 w-5" strokeWidth={2} aria-hidden />
           </button>
+          {projectType === 'novel' ? (
+            <button
+              type="button"
+              onClick={() => setKanbanOpen(true)}
+              className="shrink-0 rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
+              aria-label="플롯 칸반"
+              title="플롯 칸반"
+            >
+              <LayoutGrid className="h-5 w-5" strokeWidth={2} aria-hidden />
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => setStatsOpen(true)}
@@ -1037,6 +1051,9 @@ function ProjectWorkspaceBody({
     </div>
     <StatsModal projectId={projectId} open={statsOpen} onClose={() => setStatsOpen(false)} />
     <CommandPalette projectId={projectId} open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+    {projectType === 'novel' ? (
+      <KanbanBoard projectId={projectId} open={kanbanOpen} onClose={() => setKanbanOpen(false)} />
+    ) : null}
     </>
   )
 }
