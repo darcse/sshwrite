@@ -3,6 +3,7 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import type { Editor as TiptapEditor } from '@tiptap/core'
 import { Extension } from '@tiptap/core'
+import { TypewriterScrollExtension } from '@/components/editor/TypewriterScrollExtension'
 import StarterKit from '@tiptap/starter-kit'
 import { search } from 'prosemirror-search'
 import { createClient } from '@/lib/supabase/client'
@@ -51,6 +52,7 @@ export function Editor({
   onFocusModeChange,
   findReplaceOpen: findReplaceOpenProp,
   onFindReplaceOpenChange,
+  typewriterScroll = false,
 }: {
   documentId: string
   initialContent: unknown
@@ -61,6 +63,7 @@ export function Editor({
   onFocusModeChange: (v: boolean) => void
   findReplaceOpen?: boolean
   onFindReplaceOpenChange?: (open: boolean) => void
+  typewriterScroll?: boolean
 }) {
   const { refresh } = useBinderContext()
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
@@ -162,6 +165,7 @@ export function Editor({
           },
         }),
         findReplacePmExtension,
+        TypewriterScrollExtension,
       ],
       content: normalizeContent(initialContent),
       immediatelyRender: false,
@@ -413,6 +417,8 @@ export function Editor({
     className="relative [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:leading-tight [&_h1]:mt-5 [&_h1]:mb-3 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:leading-tight [&_h2]:mt-4 [&_h2]:mb-2.5 [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:leading-snug [&_h3]:mt-3.5 [&_h3]:mb-2"
     style={{
       padding: '16px 8px',
+      paddingTop: typewriterScroll ? '50vh' : '16px',
+      paddingBottom: typewriterScroll ? '50vh' : '16px',
       fontFamily: 'var(--font-writing)',
       lineHeight: 1.8,
       fontSize: 16,

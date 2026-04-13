@@ -15,6 +15,7 @@ import { PomodoroTimer } from '@/components/ui/PomodoroTimer'
 import { createClient } from '@/lib/supabase/client'
 import { tiptapToPlainText } from '@/lib/doc-utils'
 import {
+  AlignVerticalJustifyCenter,
   BookOpen,
   CheckCircle2,
   Circle,
@@ -195,6 +196,29 @@ function EditorPanel({ showInspectorMeta }: { showInspectorMeta: boolean }) {
   const [readingOpen, setReadingOpen] = useState(false)
   const [compileOpen, setCompileOpen] = useState(false)
   const [findReplaceOpen, setFindReplaceOpen] = useState(false)
+  const [typewriterScroll, setTypewriterScroll] = useState(false)
+  const editorScrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    try {
+      setTypewriterScroll(localStorage.getItem('sshwrite:typewriter-scroll') === 'true')
+    } catch {}
+  }, [])
+
+  const toggleTypewriter = useCallback(() => {
+    setTypewriterScroll((v) => {
+      const next = !v
+      try { localStorage.setItem('sshwrite:typewriter-scroll', String(next)) } catch {}
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!typewriterScroll) return
+    requestAnimationFrame(() => {
+      document.dispatchEvent(new Event('typewriter-activate'))
+    })
+  }, [typewriterScroll])
 
   useEffect(() => {
     setFindReplaceOpen(false)
@@ -240,6 +264,16 @@ function EditorPanel({ showInspectorMeta }: { showInspectorMeta: boolean }) {
           </button>
           <button
             type="button"
+            className="shrink-0 rounded p-1 transition-colors hover:text-[var(--foreground)]"
+            style={{ color: typewriterScroll ? 'var(--accent)' : 'var(--muted)' }}
+            onClick={toggleTypewriter}
+            aria-label="타자기 스크롤"
+            title="타자기 스크롤"
+          >
+            <AlignVerticalJustifyCenter className="h-5 w-5" strokeWidth={2} aria-hidden />
+          </button>
+          <button
+            type="button"
             className="shrink-0 rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
             onClick={() => setFocusMode((v) => !v)}
             aria-label={focusMode ? '포커스 해제' : '포커스 모드'}
@@ -254,7 +288,9 @@ function EditorPanel({ showInspectorMeta }: { showInspectorMeta: boolean }) {
         </div>
       </div>
       <div
+        ref={editorScrollRef}
         className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4"
+        {...(typewriterScroll ? { 'data-typewriter-scroll': '' } : {})}
         style={{
           backgroundColor: 'var(--card-bg)',
         }}
@@ -286,6 +322,7 @@ function EditorPanel({ showInspectorMeta }: { showInspectorMeta: boolean }) {
               onFocusModeChange={setFocusMode}
               findReplaceOpen={findReplaceOpen}
               onFindReplaceOpenChange={setFindReplaceOpen}
+              typewriterScroll={typewriterScroll}
             />
           </div>
         )}
