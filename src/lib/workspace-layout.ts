@@ -1,4 +1,4 @@
-export const STORAGE_KEY = 'sshwrite:editor-layout'
+const STORAGE_KEY = 'sshwrite:editor-layout'
 
 export type StoredLayout = {
   binderWidth: number
@@ -9,7 +9,7 @@ export type StoredLayout = {
 export const DEFAULT_BINDER = 260
 export const DEFAULT_INSPECTOR = 280
 export const MIN_PANEL = 160
-export const MIN_EDITOR = 200
+const MIN_EDITOR = 200
 export const SPLITTER_PX = 6
 export const COLLAPSE_RAIL_PX = 28
 export const LABEL_COLORS = [

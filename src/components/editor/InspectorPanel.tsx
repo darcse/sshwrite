@@ -75,7 +75,11 @@ export function InspectorPanel() {
         .update({ memo: next || null })
         .eq('id', doc.id)
         .eq('user_id', user.id)
-      if (!error) await refresh()
+      if (error) {
+        console.error('memo 저장 실패', error)
+      } else {
+        await refresh()
+      }
     }, 1000)
     return () => clearTimeout(timer)
   }, [memoDraft, doc?.id, refresh])
@@ -195,6 +199,9 @@ export function InspectorPanel() {
       setSynopsisDraft(next)
       await patch({ synopsis: next || null })
       await refresh()
+    } catch (err) {
+      console.error('synopsis 생성 실패', err)
+      window.alert('요약 생성에 실패했습니다.')
     } finally {
       setSynopsisGenerating(false)
     }
