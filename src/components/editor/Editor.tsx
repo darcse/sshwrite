@@ -13,7 +13,7 @@ import { FindReplacePanel } from '@/components/editor/FindReplacePanel'
 import { registerSnapshotBridge } from '@/components/editor/SnapshotPanel'
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+import { Loader2, Paintbrush, X } from 'lucide-react'
 
 function countWords(text: string) {
   const t = text.trim()
@@ -72,6 +72,12 @@ export function Editor({
   const [targetWords, setTargetWords] = useState<number | null>(null)
   const [inspectorMount, setInspectorMount] = useState<HTMLElement | null>(null)
   const [aiActionLoading, setAiActionLoading] = useState(false)
+  const [sdtLoading, setSdtLoading] = useState(false)
+  const [sdtVersions, setSdtVersions] = useState<string[] | null>(null)
+  const [sdtErr, setSdtErr] = useState<string | null>(null)
+  const [sdtRange, setSdtRange] = useState<{ from: number; to: number } | null>(
+    null
+  )
   const [selectionMenu, setSelectionMenu] = useState<{
     visible: boolean
     top: number
@@ -259,6 +265,14 @@ export function Editor({
   }, [editor])
 
   useEffect(() => {
+    if (selectionMenu.visible) return
+    setSdtLoading(false)
+    setSdtVersions(null)
+    setSdtErr(null)
+    setSdtRange(null)
+  }, [selectionMenu.visible])
+
+  useEffect(() => {
     if (!focusMode) return
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
@@ -381,6 +395,61 @@ export function Editor({
     [editor, aiActionLoading]
   )
 
+  const runShowDontTell = useCallback(async () => {
+    if (!editor || sdtLoading || aiActionLoading) return
+    const { from, to, empty } = editor.state.selection
+    if (empty) return
+    const selection = editor.state.doc.textBetween(from, to, ' ').trim()
+    if (!selection) return
+    setSdtErr(null)
+    setSdtVersions(null)
+    setSdtRange({ from, to })
+    setSdtLoading(true)
+    try {
+      const res = await fetch('/api/show-dont-tell', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selectedText: selection }),
+      })
+      const data = (await res.json()) as { versions?: unknown; error?: string }
+      if (!res.ok) {
+        setSdtErr(data.error || '요청에 실패했습니다.')
+        return
+      }
+      const v = data.versions
+      if (
+        !Array.isArray(v) ||
+        v.length !== 3 ||
+        !v.every((x): x is string => typeof x === 'string')
+      ) {
+        setSdtErr('\uc751\ub2f5\uc744 \ud574\uc11d\ud560 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4.')
+        return
+      }
+      setSdtVersions(v)
+    } catch {
+      setSdtErr('요청 처리 중 오류가 발생했습니다.')
+    } finally {
+      setSdtLoading(false)
+    }
+  }, [editor, sdtLoading, aiActionLoading])
+
+  const applySdtVersion = useCallback(
+    (text: string) => {
+      if (!editor || !sdtRange) return
+      const t = text.trim()
+      if (!t) return
+      editor
+        .chain()
+        .focus()
+        .insertContentAt({ from: sdtRange.from, to: sdtRange.to }, t)
+        .run()
+      setSdtVersions(null)
+      setSdtErr(null)
+      setSdtRange(null)
+    },
+    [editor, sdtRange]
+  )
+
   return (
     <div
       className={
@@ -433,38 +502,97 @@ export function Editor({
   >
             {selectionMenu.visible ? (
               <div
-                className="fixed z-[320] flex -translate-x-1/2 items-center gap-1 rounded border px-1 py-1"
+                className="fixed z-[320] flex -translate-x-1/2 flex-col items-center gap-1"
                 style={{
                   top: selectionMenu.top,
                   left: selectionMenu.left,
-                  borderColor: 'var(--border)',
-                  backgroundColor: 'var(--card-bg)',
                 }}
               >
-                <button
-                  type="button"
-                  onClick={() => void runSelectionAiAction('polish')}
-                  disabled={aiActionLoading}
-                  className="rounded px-2 py-1 text-xs text-[var(--muted)] transition-colors hover:text-[var(--foreground)] disabled:opacity-50"
+                <div
+                  className="flex items-center gap-1 rounded border px-1 py-1"
+                  style={{
+                    borderColor: 'var(--border)',
+                    backgroundColor: 'var(--card-bg)',
+                  }}
                 >
-                  다듬기
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void runSelectionAiAction('continue')}
-                  disabled={aiActionLoading}
-                  className="rounded px-2 py-1 text-xs text-[var(--muted)] transition-colors hover:text-[var(--foreground)] disabled:opacity-50"
-                >
-                  이어쓰기
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void runSelectionAiAction('summarize')}
-                  disabled={aiActionLoading}
-                  className="rounded px-2 py-1 text-xs text-[var(--muted)] transition-colors hover:text-[var(--foreground)] disabled:opacity-50"
-                >
-                  요약
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => void runSelectionAiAction('polish')}
+                    disabled={aiActionLoading || sdtLoading}
+                    className="rounded px-2 py-1 text-xs text-[var(--muted)] transition-colors hover:text-[var(--foreground)] disabled:opacity-50"
+                  >
+                    다듬기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void runSelectionAiAction('continue')}
+                    disabled={aiActionLoading || sdtLoading}
+                    className="rounded px-2 py-1 text-xs text-[var(--muted)] transition-colors hover:text-[var(--foreground)] disabled:opacity-50"
+                  >
+                    이어쓰기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void runSelectionAiAction('summarize')}
+                    disabled={aiActionLoading || sdtLoading}
+                    className="rounded px-2 py-1 text-xs text-[var(--muted)] transition-colors hover:text-[var(--foreground)] disabled:opacity-50"
+                  >
+                    요약
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void runShowDontTell()}
+                    disabled={
+                      aiActionLoading ||
+                      sdtLoading ||
+                      editor?.state.selection.empty
+                    }
+                    title="Show Don't Tell"
+                    aria-label="SDT"
+                    className="inline-flex items-center justify-center rounded px-2 py-1 text-xs text-[var(--muted)] transition-colors hover:text-[var(--foreground)] disabled:opacity-50"
+                  >
+                    {sdtLoading ? (
+                      <Loader2
+                        className="h-3.5 w-3.5 animate-spin"
+                        aria-hidden
+                      />
+                    ) : (
+                      <Paintbrush className="h-3.5 w-3.5" aria-hidden />
+                    )}
+                  </button>
+                </div>
+                {sdtErr ? (
+                  <p
+                    className="max-w-xs rounded border border-red-500/40 bg-[var(--card-bg)] px-2 py-1 text-center text-xs text-red-500"
+                    role="alert"
+                  >
+                    {sdtErr}
+                  </p>
+                ) : null}
+                {sdtVersions ? (
+                  <div
+                    className="max-h-52 w-[min(90vw,28rem)] space-y-1 overflow-y-auto rounded border p-2"
+                    style={{
+                      borderColor: 'var(--border)',
+                      backgroundColor: 'var(--card-bg)',
+                    }}
+                  >
+                    {sdtVersions.map((v, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => applySdtVersion(v)}
+                        className="w-full rounded border px-2 py-1.5 text-left text-xs leading-snug text-[var(--foreground)] transition-colors hover:bg-[var(--badge-bg)]"
+                        style={{ borderColor: 'var(--border)' }}
+                      >
+                        <span className="font-medium text-[var(--muted)]">
+                          {i + 1}.{' '}
+                        </span>
+                        <span className="whitespace-pre-wrap">{v}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ) : null}
             <EditorContent editor={editor} />
