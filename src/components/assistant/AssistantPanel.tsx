@@ -1,6 +1,7 @@
 'use client'
 
 import { useBinderContext } from '@/components/binder/BinderTree'
+import { fetchWorldviewContext } from '@/lib/fetch-worldview-context'
 import { Loader2, Send, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -16,7 +17,7 @@ export function AssistantPanel({
   documentId: string | null
   documentText: string
 }) {
-  const { projectType } = useBinderContext()
+  const { projectType, projectId } = useBinderContext()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -30,10 +31,11 @@ export function AssistantPanel({
   }, [documentId])
 
   async function callAssistant(payload: Record<string, unknown>) {
+    const worldviewContext = await fetchWorldviewContext(projectId)
     const res = await fetch('/api/assistant', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, worldviewContext }),
     })
     if (!res.ok) {
       const json = (await res.json().catch(() => ({}))) as { error?: string }

@@ -1,8 +1,10 @@
+import { prependWorldviewToSystem } from '@/lib/ai-system-prompt'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 type ReqBody = {
   body?: string
+  worldviewContext?: string
 }
 
 export async function POST(req: Request) {
@@ -26,7 +28,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'API \ud0a4\uac00 \uc124\uc815\ub418\uc9c0 \uc54a\uc558\uc2b5\ub2c8\ub2e4.' }, { status: 500 })
     }
 
-    const systemPrompt = '너는 소설 작가의 플롯 구성을 돕는 어시스턴트야. 사용자가 입력한 사건 개요를 바탕으로 사건의 핵심 흐름만 3~4문장으로 간결하게 제안해줘. 인물의 행동과 상황 전환 중심으로, 감정 묘사나 배경 디테일은 최소화해.'
+    const baseSystem =
+      '너는 소설 작가의 플롯 구성을 돕는 어시스턴트야. 사용자가 입력한 사건 개요를 바탕으로 사건의 핵심 흐름만 3~4문장으로 간결하게 제안해줘. 인물의 행동과 상황 전환 중심으로, 감정 묘사나 배경 디테일은 최소화해.'
+    const systemPrompt = prependWorldviewToSystem(baseSystem, body.worldviewContext)
     const userMessage = `다음 사건 개요를 디테일한 사건 서술로 확장해줘.\n개요: ${outline}`
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {

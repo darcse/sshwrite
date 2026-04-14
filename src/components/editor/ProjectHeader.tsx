@@ -1,6 +1,7 @@
 'use client'
 
 import { ScratchpadPanel } from '@/components/editor/ScratchpadPanel'
+import { StoryBiblePanel } from '@/components/editor/StoryBiblePanel'
 import { CommandPalette } from '@/components/editor/CommandPalette'
 import { KanbanBoard } from '@/components/editor/KanbanBoard'
 import { StatsModal } from '@/components/editor/StatsModal'
@@ -61,6 +62,7 @@ export function ProjectHeader({ projectId }: { projectId: string }) {
           >
             <ChartColumn className="h-5 w-5" strokeWidth={2} aria-hidden />
           </button>
+          <StoryBiblePanel projectId={projectId} />
           <ScratchpadPanel projectId={projectId} />
         </div>
       </div>

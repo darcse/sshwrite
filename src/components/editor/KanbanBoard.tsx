@@ -1,6 +1,7 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
+import { fetchWorldviewContext } from '@/lib/fetch-worldview-context'
 import {
   closestCorners,
   DndContext,
@@ -424,10 +425,12 @@ function KanbanColorPalette({
 
 export function KanbanCardEditModal({
   card,
+  projectId,
   onRequestClose,
   onSave,
 }: {
   card: KCard | null
+  projectId: string
   onRequestClose: () => void | Promise<void>
   onSave: (title: string, body: string) => Promise<void>
 }) {
@@ -474,10 +477,11 @@ export function KanbanCardEditModal({
               void (async () => {
                 setAiGenerating(true)
                 try {
+                  const worldviewContext = await fetchWorldviewContext(projectId)
                   const res = await fetch('/api/generate-event', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ body: aiOutline }),
+                    body: JSON.stringify({ body: aiOutline, worldviewContext }),
                   })
                   const data = (await res.json()) as { text?: string; error?: string }
                   if (!res.ok) {
@@ -1069,6 +1073,7 @@ export function KanbanBoard({ projectId, open, onClose }: KanbanBoardProps) {
 
       <KanbanCardEditModal
         card={editing}
+        projectId={projectId}
         onRequestClose={() => void dismissEditModal()}
         onSave={(title, body) => saveEditFromModal(title, body)}
       />

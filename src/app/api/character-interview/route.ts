@@ -1,3 +1,4 @@
+import { prependWorldviewToSystem } from '@/lib/ai-system-prompt'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
@@ -8,6 +9,7 @@ type ReqBody = {
   memo?: string | null
   tags?: unknown
   question?: string
+  worldviewContext?: string
 }
 
 function tagsForPrompt(tags: unknown): string {
@@ -54,7 +56,7 @@ export async function POST(req: Request) {
     const memo = body.memo != null ? String(body.memo) : ''
     const tagStr = tagsForPrompt(body.tags)
 
-    const systemPrompt =
+    const baseSystem =
       "\ub108\ub294 \uc18c\uc124 \uc18d \uce90\ub9ad\ud130 '" +
       name +
       "'\uc774\uc57c.\n\uc124\uba85: " +
@@ -64,6 +66,7 @@ export async function POST(req: Request) {
       '\n\ud0dc\uadf8: ' +
       tagStr +
       '\n\uc704 \uc124\uc815\uc5d0 \ub9de\uac8c 1\uc778\uce6d\uc73c\ub85c \ub300\ud654\uc5d0 \uc751\ud574\uc918. \uc808\ub300 \uce90\ub9ad\ud130\uc5d0\uc11c \ubc97\uc5b4\ub098\uc9c0 \ub9c8.'
+    const systemPrompt = prependWorldviewToSystem(baseSystem, body.worldviewContext)
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

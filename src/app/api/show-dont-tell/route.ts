@@ -1,8 +1,10 @@
+import { prependWorldviewToSystem } from '@/lib/ai-system-prompt'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 type ReqBody = {
   selectedText?: string
+  worldviewContext?: string
 }
 
 function extractVersions(raw: string): string[] | null {
@@ -48,8 +50,9 @@ export async function POST(req: Request) {
       )
     }
 
-    const systemPrompt =
+    const baseSystem =
       '\ub108\ub294 \uc18c\uc124 \uc791\uac00\ub97c \ub3cb\ub294 \ubb38\uc7a5 \uac1c\uc120 \uc5b4\uc2dc\uc2a4\ud134\ud2b8\uc57c. \'Show Don\'t Tell\' \uc6d0\uce59\uc5d0 \ub530\ub77c \uc9c1\uc811 \uc11c\uc220\uc744 \uac10\uac01\uc801\uc774\uace0 \uad6c\uccb4\uc801\uc778 \ubb18\uc0ac\ub85c \ubcc0\ud658\ud574\uc918. \ubc18\ub4dc\uc2dc JSON \ubc30\uc5f4\ub85c\ub9cc \uc751\ub2f5\ud574. \ud615\uc2dd: ["\ubc84\uc8041", "\ubc84\uc8042", "\ubc84\uc8043"]'
+    const systemPrompt = prependWorldviewToSystem(baseSystem, body.worldviewContext)
 
     const userPrompt =
       '\ub2e4\uc74c \ubb38\uc7a5\uc744 Show Don\'t Tell \uc6d0\uce59\uc73c\ub85c 3\uac00\uc9c0 \ubc84\uc804\uc73c\ub85c \ubcc0\ud658\ud574\uc918:\n' +

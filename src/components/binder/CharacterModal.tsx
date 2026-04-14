@@ -2,6 +2,7 @@
 
 import type { CharacterRow } from '@/components/binder/CharacterPanel'
 import { createClient } from '@/lib/supabase/client'
+import { fetchWorldviewContext } from '@/lib/fetch-worldview-context'
 import { Loader2, PenLine, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -118,6 +119,7 @@ export function CharacterModal({
     setInterviewSend(true)
     setInterviewErr(null)
     try {
+      const worldviewContext = await fetchWorldviewContext(projectId)
       const res = await fetch('/api/character-interview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -128,6 +130,7 @@ export function CharacterModal({
           memo,
           tags,
           question: q,
+          worldviewContext,
         }),
       })
       const data = (await res.json()) as { text?: string; error?: string }
@@ -316,10 +319,11 @@ export function CharacterModal({
     setAiError(null)
     setAiSuggestions(null)
     try {
+      const worldviewContext = await fetchWorldviewContext(projectId)
       const res = await fetch('/api/generate-character', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind }),
+        body: JSON.stringify({ kind, worldviewContext }),
       })
       const data = (await res.json()) as { suggestions?: unknown; error?: string }
       if (!res.ok) {

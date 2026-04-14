@@ -8,6 +8,7 @@ import StarterKit from '@tiptap/starter-kit'
 import { search } from 'prosemirror-search'
 import { createClient } from '@/lib/supabase/client'
 import { useBinderContext } from '@/components/binder/BinderTree'
+import { fetchWorldviewContext } from '@/lib/fetch-worldview-context'
 import { EditorToolbar } from '@/components/editor/EditorToolbar'
 import { FindReplacePanel } from '@/components/editor/FindReplacePanel'
 import { registerSnapshotBridge } from '@/components/editor/SnapshotPanel'
@@ -66,7 +67,7 @@ export function Editor({
   onFindReplaceOpenChange?: (open: boolean) => void
   typewriterScroll?: boolean
 }) {
-  const { refresh } = useBinderContext()
+  const { refresh, projectId } = useBinderContext()
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [wordCount, setWordCount] = useState(0)
   const [targetWords, setTargetWords] = useState<number | null>(null)
@@ -367,10 +368,11 @@ export function Editor({
       if (!selection) return
       setAiActionLoading(true)
       try {
+        const worldviewContext = await fetchWorldviewContext(projectId)
         const res = await fetch('/api/assistant', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode, selection }),
+          body: JSON.stringify({ mode, selection, worldviewContext }),
         })
         const json = (await res.json()) as { text?: string }
         if (!res.ok || !json.text) return
@@ -392,7 +394,7 @@ export function Editor({
         setAiActionLoading(false)
       }
     },
-    [editor, aiActionLoading]
+    [editor, aiActionLoading, projectId]
   )
 
   const runShowDontTell = useCallback(async () => {
@@ -406,10 +408,11 @@ export function Editor({
     setSdtRange({ from, to })
     setSdtLoading(true)
     try {
+      const worldviewContext = await fetchWorldviewContext(projectId)
       const res = await fetch('/api/show-dont-tell', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ selectedText: selection }),
+        body: JSON.stringify({ selectedText: selection, worldviewContext }),
       })
       const data = (await res.json()) as { versions?: unknown; error?: string }
       if (!res.ok) {
@@ -431,7 +434,7 @@ export function Editor({
     } finally {
       setSdtLoading(false)
     }
-  }, [editor, sdtLoading, aiActionLoading])
+  }, [editor, sdtLoading, aiActionLoading, projectId])
 
   const applySdtVersion = useCallback(
     (text: string) => {

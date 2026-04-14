@@ -448,6 +448,7 @@ export function InspectorPanel() {
       {saving ? <p className="text-xs text-[var(--muted)]">저장 중…</p> : null}
       <KanbanCardEditModal
         card={kanbanModalCard}
+        projectId={projectId}
         onRequestClose={() => setKanbanModalCard(null)}
         onSave={async (title, body) => {
           if (!kanbanModalCard) return

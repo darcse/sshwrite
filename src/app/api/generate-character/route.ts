@@ -1,8 +1,10 @@
+import { prependWorldviewToSystem } from '@/lib/ai-system-prompt'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 type ReqBody = {
   kind?: 'character' | 'place'
+  worldviewContext?: string
 }
 
 type Suggestion = { name: string; description: string }
@@ -50,6 +52,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'API 키가 설정되지 않았습니다.' }, { status: 500 })
     }
 
+
+    const baseSystem =
+      '응답은 유효한 JSON 배열만 출력하세요. 코드 블록이나 다른 설명을 붙이지 마세요.'
+    const systemPrompt = prependWorldviewToSystem(baseSystem, body.worldviewContext)
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -60,8 +66,7 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1024,
-        system:
-          '응답은 유효한 JSON 배열만 출력하세요. 코드 블록이나 다른 설명을 붙이지 마세요.',
+        system: systemPrompt,
         messages: [{ role: 'user', content: userMessage }],
       }),
     })

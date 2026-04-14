@@ -1,3 +1,4 @@
+import { prependWorldviewToSystem } from '@/lib/ai-system-prompt'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
@@ -7,6 +8,7 @@ type ReqBody = {
   message?: string
   context?: string
   selection?: string
+  worldviewContext?: string
 }
 
 function buildPrompt(body: ReqBody) {
@@ -40,10 +42,11 @@ export async function POST(req: Request) {
 
     const body = (await req.json()) as ReqBody
     const prompt = buildPrompt(body)
-    const systemPrompt =
+    const baseSystem =
       body.type === 'lyrics'
         ? '당신은 전문 작사가입니다. 사용자의 가사 작성을 돕는 조언을 한국어로 제공해주세요. 운율, 라임, 멜로디 흐름을 고려해주세요.'
         : '당신은 소설 편집자입니다. 사용자의 소설 집필을 돕는 조언을 한국어로 제공해주세요.'
+    const systemPrompt = prependWorldviewToSystem(baseSystem, body.worldviewContext)
     const key = process.env.ANTHROPIC_API_KEY
     if (!key) {
       return NextResponse.json({ error: 'API 키가 설정되지 않았습니다.' }, { status: 500 })
