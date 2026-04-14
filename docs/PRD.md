@@ -32,7 +32,7 @@
 ### 3.1 프로젝트 관리
 
 - 프로젝트 생성 / 수정 / 삭제
-- 프로젝트 타입 선택 (소설 / 가사)
+- 프로젝트 타입 선택 (소설 / 가사): 타입에 따라 AI 프롬프트 및 UI 분기
 - 커버 이미지 업로드 또는 커버 컬러 선택 (Supabase Storage)
 - 대시보드에서 프로젝트 목록 조회
 - 프로젝트 카드: 문서 수, 상태 분포(예정/작성중/완료) 진행 바, 마지막 수정일
@@ -64,6 +64,7 @@
 - 커맨드 팔레트 (Cmd+K): 전체 프로젝트 문서 전문 검색, 결과 10개 표시
 - 읽기 모드: 전체 문서 트리를 순서대로 렌더링
 - 스크래치패드: 프로젝트 단위 임시 메모 (자동 저장)
+- 타자기 스크롤 (EDIT-009): ProseMirror Extension 기반. 활성화 시 커서 줄이 항상 화면 중앙에 유지됨. on/off 상태 localStorage 저장, `data-typewriter-scroll` DOM 속성 + `typewriter-activate` 커스텀 이벤트로 토글 처리
 
 ### 3.4 스냅샷
 
@@ -94,6 +95,7 @@
 - 생성 / 수정 모달: 이름, 설명, 메모, 태그, 이미지 업로드(파일 또는 URL)
 - 삭제 (편집 모드에서)
 - 이미지는 Supabase Storage에 저장
+- AI 이름/설정 제너레이터 (AI-005): 캐릭터·장소 모달에서 'AI 생성' 버튼 클릭 시 이름+설명 3개 제안, 선택 시 필드 자동 입력
 
 ### 3.8 AI 어시스턴트
 
@@ -122,6 +124,16 @@
 - 시작/일시정지/리셋
 - 단계 전환 시 브라우저 알림
 - 완료한 포모도로 횟수 표시
+
+### 3.12 플롯 칸반 보드 (novel 타입 전용)
+
+- 프로젝트 헤더 아이콘으로 열리는 풀스크린 오버레이
+- 챕터/막 단위 컬럼 추가 및 삭제
+- 컬럼 안에 사건 카드 추가
+- 카드 드래그: 같은 컬럼 내 순서 변경 및 다른 컬럼으로 이동
+- 컬럼 드래그: 컬럼 순서 변경
+- 데이터 Supabase DB 저장 (새로고침 후 유지)
+- lyrics 타입 프로젝트에서는 헤더 아이콘 미노출
 
 ---
 
@@ -213,29 +225,36 @@ src/
 ├── app/
 │   ├── page.tsx                        # 대시보드 (프로젝트 목록)
 │   ├── (auth)/login/page.tsx           # 로그인
-│   ├── projects/[projectId]/page.tsx   # 프로젝트 워크스페이스 (레이아웃, 인스펙터, 패널 관리)
+│   ├── projects/[projectId]/page.tsx   # 프로젝트 워크스페이스 (레이아웃, 패널 관리)
 │   └── api/
 │       ├── assistant/route.ts          # AI 어시스턴트 (chat/ideas/polish/continue/summarize)
-│       └── summarize/route.ts          # 시놉시스 자동 생성
+│       ├── summarize/route.ts          # 시놉시스 자동 생성
+│       └── generate-character/route.ts # 캐릭터·장소 이름/설명 AI 제너레이터
 │
 ├── components/
 │   ├── binder/
 │   │   ├── BinderTree.tsx              # Context Provider, DndContext, 문서 CRUD, 드래그 로직
 │   │   ├── BinderItem.tsx              # 개별 트리 아이템 (드롭 인디케이터, 폴더 하이라이트)
+│   │   ├── BinderHeaderBar.tsx         # 바인더 헤더 (새 문서/폴더 버튼, 접기 토글 아이콘)
 │   │   ├── CharacterPanel.tsx          # 캐릭터/장소 목록 + 추가 버튼
 │   │   ├── CharacterCard.tsx           # 캐릭터/장소 카드 UI
 │   │   └── CharacterModal.tsx          # 캐릭터/장소 생성/수정 모달
 │   │
 │   ├── editor/
 │   │   ├── Editor.tsx                  # Tiptap 에디터 코어 (자동저장, 단어수, 포커스모드)
+│   │   ├── EditorPanel.tsx             # 에디터 패널 (헤더 툴바, 스크롤 컨테이너, 타자기 스크롤 제어)
 │   │   ├── EditorToolbar.tsx           # 서식 도구바
+│   │   ├── ProjectHeader.tsx           # 프로젝트 헤더 (제목, 통계/칸반/컴파일/스크래치패드 버튼)
+│   │   ├── InspectorPanel.tsx          # 인스펙터 패널 (시놉시스/상태/라벨/스냅샷/메모)
+│   │   ├── TypewriterScrollExtension.ts # ProseMirror 타자기 스크롤 Extension
 │   │   ├── FindReplacePanel.tsx        # 찾기/바꾸기 패널
 │   │   ├── CommandPalette.tsx          # 전문 검색 팔레트 (Cmd+K)
 │   │   ├── SnapshotPanel.tsx           # 스냅샷 관리 패널
 │   │   ├── ScratchpadPanel.tsx         # 스크래치패드 패널
 │   │   ├── CompileModal.tsx            # 컴파일/내보내기 모달
 │   │   ├── ReadingMode.tsx             # 읽기 모드 패널
-│   │   └── StatsModal.tsx             # 집필 통계 모달
+│   │   ├── KanbanBoard.tsx             # 플롯 칸반 보드 (novel 전용)
+│   │   └── StatsModal.tsx              # 집필 통계 모달
 │   │
 │   ├── corkboard/
 │   │   ├── Corkboard.tsx               # 폴더 내 문서 카드 그리드
@@ -251,6 +270,7 @@ src/
 │
 └── lib/
     ├── doc-utils.ts                    # 공통 유틸 (sortByOrder, getChildren, tiptapToPlainText)
+    ├── workspace-layout.ts             # 레이아웃 상수·타입·유틸 (DEFAULT_BINDER, clampBinder 등)
     └── supabase/
         ├── client.ts                   # 브라우저 Supabase 클라이언트
         └── server.ts                   # 서버 Supabase 클라이언트 (쿠키 기반)
@@ -259,7 +279,7 @@ src/
 ### 상태 관리
 
 - **BinderContext** (React Context): 문서 목록, 라벨, 드래그 상태, CRUD 함수 공유
-- **localStorage**: 에디터 레이아웃 (`sshwrite:editor-layout:{projectId}`), 단어 수 목표 (`sshwrite:word-goal:{documentId}`)
+- **localStorage**: 에디터 레이아웃 (`sshwrite:editor-layout:{projectId}`), 단어 수 목표 (`sshwrite:word-goal:{documentId}`), 타자기 스크롤 on/off (`sshwrite:typewriter-scroll`)
 - **컴포넌트 로컬 state**: 모달 열림, 편집 중, 저장 중 등 UI 상태
 
 ### API 패턴
