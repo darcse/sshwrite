@@ -1,12 +1,13 @@
 'use client'
 
 import { useBinderContext } from '@/components/binder/BinderTree'
+import { KanbanCardEditModal, type KCard } from '@/components/editor/KanbanBoard'
 import { SnapshotPanel } from '@/components/editor/SnapshotPanel'
 import { createClient } from '@/lib/supabase/client'
 import { tiptapToPlainText } from '@/lib/doc-utils'
 import { LABEL_COLORS } from '@/lib/workspace-layout'
 import { CheckCircle2, Circle, Loader2, PenLine, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 export function InspectorPanel() {
   const {
@@ -25,6 +26,8 @@ export function InspectorPanel() {
   const [synopsisDraft, setSynopsisDraft] = useState('')
   const [synopsisGenerating, setSynopsisGenerating] = useState(false)
   const [memoDraft, setMemoDraft] = useState('')
+  const [relatedKanbanCards, setRelatedKanbanCards] = useState<KCard[]>([])
+  const [kanbanModalCard, setKanbanModalCard] = useState<KCard | null>(null)
   const doc = selectedDocId ? documents.find((d) => d.id === selectedDocId) : undefined
   const docLabelId = (doc?.label_id ?? doc?.label) ?? null
   const selectedLabel = labels.find((l) => l.id === docLabelId)
@@ -83,6 +86,69 @@ export function InspectorPanel() {
     }, 1000)
     return () => clearTimeout(timer)
   }, [memoDraft, doc?.id, refresh])
+
+  const loadRelatedKanbanCards = useCallback(async () => {
+    if (!selectedDocId) {
+      setRelatedKanbanCards([])
+      return
+    }
+    const d = documents.find((x) => x.id === selectedDocId)
+    if (!d || d.type !== 'document') {
+      setRelatedKanbanCards([])
+      return
+    }
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      setRelatedKanbanCards([])
+      return
+    }
+    const { data: links, error: linkErr } = await supabase
+      .from('write_kanban_card_documents')
+      .select('card_id')
+      .eq('document_id', d.id)
+      .eq('user_id', user.id)
+    if (linkErr || !links?.length) {
+      setRelatedKanbanCards([])
+      return
+    }
+    const cardIds = links.map((l) => l.card_id)
+    const { data: cardRows, error: cardErr } = await supabase
+      .from('write_kanban_cards')
+      .select('id, column_id, user_id, title, body, order_index, color')
+      .in('id', cardIds)
+    if (cardErr || !cardRows?.length) {
+      setRelatedKanbanCards([])
+      return
+    }
+    const list = (cardRows as KCard[]).map((raw) => ({
+      ...raw,
+      color: (raw as { color?: string | null }).color ?? null,
+    }))
+    list.sort((a, b) => a.title.localeCompare(b.title, 'ko'))
+    setRelatedKanbanCards(list)
+  }, [selectedDocId, documents])
+
+  useEffect(() => {
+    void loadRelatedKanbanCards()
+  }, [loadRelatedKanbanCards])
+
+  useEffect(() => {
+    setKanbanModalCard(null)
+  }, [selectedDocId])
+
+  useEffect(() => {
+    if (!kanbanModalCard) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      setKanbanModalCard(null)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [kanbanModalCard])
 
   async function saveLabel() {
     if (!doc || doc.type !== 'document') return
@@ -350,7 +416,7 @@ export function InspectorPanel() {
         <span className="text-[var(--muted)]">스냅샷</span>
         <SnapshotPanel documentId={doc.id} />
       </div>
-      <label className="mb-6 flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1 text-sm">
         <span className="text-[var(--muted)]">메모</span>
         <textarea
           rows={5}
@@ -360,7 +426,44 @@ export function InspectorPanel() {
           className="input-apple w-full resize-none px-2 py-1.5 text-sm"
         />
       </label>
+      <div className="flex flex-col gap-1 text-sm">
+        <span className="text-[var(--muted)]">관련 사건</span>
+        <div className="flex max-h-28 flex-col gap-1.5 overflow-y-auto">
+          {relatedKanbanCards.length === 0 ? (
+            <p className="text-xs text-[var(--muted)]">연결된 사건이 없습니다</p>
+          ) : (
+            relatedKanbanCards.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setKanbanModalCard(c)}
+                className="w-full truncate rounded-md border border-[var(--border)] bg-[var(--card-bg)] px-3 py-2 text-left text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--badge-bg)]"
+              >
+                {c.title}
+              </button>
+            ))
+          )}
+        </div>
+      </div>
       {saving ? <p className="text-xs text-[var(--muted)]">저장 중…</p> : null}
+      <KanbanCardEditModal
+        card={kanbanModalCard}
+        onRequestClose={() => setKanbanModalCard(null)}
+        onSave={async (title, body) => {
+          if (!kanbanModalCard) return
+          const supabase = createClient()
+          const { error } = await supabase
+            .from('write_kanban_cards')
+            .update({ title, body: body || null })
+            .eq('id', kanbanModalCard.id)
+          if (error) {
+            console.error(error)
+            return
+          }
+          setKanbanModalCard(null)
+          await loadRelatedKanbanCards()
+        }}
+      />
     </div>
   )
 }

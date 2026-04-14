@@ -302,18 +302,12 @@ export function Editor({
   }, [])
 
   useLayoutEffect(() => {
-    const host = document.querySelector(
-      'aside[data-panel="inspector"] [data-inspector-panel-content]'
+    const el = document.querySelector(
+      'aside[data-panel="inspector"] [data-inspector-meta-mount]'
     ) as HTMLElement | null
-    if (!host) return
-    const el = document.createElement('div')
-    host.appendChild(el)
     setInspectorMount(el)
     return () => {
       setInspectorMount(null)
-      if (el.parentNode === host) {
-        host.removeChild(el)
-      }
     }
   }, [])
 
@@ -485,8 +479,8 @@ export function Editor({
       </div>
       {showInspectorMeta && inspectorMount
         ? createPortal(
-            <div className="mb-8">
-              <div className="border-b pb-5" style={{ borderColor: 'var(--border)' }}>
+            <div>
+              <div className="border-b pb-4" style={{ borderColor: 'var(--border)' }}>
                 <label className="flex flex-col gap-1.5 text-sm">
                   <span className="text-[var(--muted)]">목표 단어 수</span>
                   <input
@@ -521,7 +515,7 @@ export function Editor({
                   </div>
                 ) : null}
               </div>
-              <div className="pt-5 text-xs text-[var(--muted)]">
+              <div className="pt-4 text-xs text-[var(--muted)]">
                 <p>최초 등록 {formatDateTime(createdAt)}</p>
                 <p>최종 수정 {formatDateTime(updatedAt)}</p>
               </div>

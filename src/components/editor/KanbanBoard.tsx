@@ -53,7 +53,7 @@ function dotFill(hex: string | null | undefined) {
   return hex && /^#[0-9A-Fa-f]{6}$/i.test(hex) ? hex : DEFAULT_COLOR_DOT
 }
 
-type KCard = {
+export type KCard = {
   id: string
   column_id: string
   user_id: string
@@ -422,6 +422,123 @@ function KanbanColorPalette({
   )
 }
 
+export function KanbanCardEditModal({
+  card,
+  onRequestClose,
+  onSave,
+}: {
+  card: KCard | null
+  onRequestClose: () => void | Promise<void>
+  onSave: (title: string, body: string) => Promise<void>
+}) {
+  const [editTitle, setEditTitle] = useState('')
+  const [editBody, setEditBody] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [aiGenerating, setAiGenerating] = useState(false)
+
+  useEffect(() => {
+    if (!card) return
+    setEditTitle(card.title)
+    setEditBody(card.body ?? '')
+    setAiGenerating(false)
+  }, [card?.id, card?.title, card?.body])
+
+  if (!card) return null
+
+  const aiOutline = editBody.trim() || editTitle.trim()
+
+  return (
+    <div
+      className="fixed inset-0 z-[540] flex items-center justify-center p-4 modal-overlay-apple"
+      role="presentation"
+      onClick={() => void onRequestClose()}
+    >
+      <div
+        className="modal-panel-apple w-full max-w-md p-4 shadow-xl"
+        onClick={(ev) => ev.stopPropagation()}
+      >
+        <div className="mb-3 text-sm font-semibold text-[var(--foreground)]">카드 편집</div>
+        <label className="mb-2 block text-xs text-[var(--muted)]">제목</label>
+        <input
+          type="text"
+          value={editTitle}
+          onChange={(e) => setEditTitle(e.target.value)}
+          className="input-apple mb-3 w-full rounded-md px-3 py-2 text-sm"
+        />
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="text-xs text-[var(--muted)]">내용</span>
+          <button
+            type="button"
+            disabled={aiGenerating || saving || !aiOutline}
+            onClick={() => {
+              void (async () => {
+                setAiGenerating(true)
+                try {
+                  const res = await fetch('/api/generate-event', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ body: aiOutline }),
+                  })
+                  const data = (await res.json()) as { text?: string; error?: string }
+                  if (!res.ok) {
+                    window.alert(data.error || '생성에 실패했습니다.')
+                    return
+                  }
+                  const next = (data.text ?? '').trim()
+                  if (next) setEditBody(next)
+                } catch {
+                  window.alert('생성에 실패했습니다.')
+                } finally {
+                  setAiGenerating(false)
+                }
+              })()
+            }}
+            className="btn-accent inline-flex shrink-0 items-center gap-1 rounded px-2 py-1 font-semibold disabled:opacity-50"
+            style={{ fontSize: 12 }}
+          >
+            {aiGenerating ? (
+              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
+            ) : null}
+            사건 생성
+          </button>
+        </div>
+        <textarea
+          value={editBody}
+          onChange={(e) => setEditBody(e.target.value)}
+          rows={12}
+          className="input-apple mb-4 min-h-[240px] w-full resize-y rounded-md px-3 py-2 text-sm"
+        />
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            className="btn-apple btn-apple-secondary px-3 py-1.5 text-xs"
+            onClick={() => void onRequestClose()}
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            className="btn-apple px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+            onClick={() => {
+              void (async () => {
+                setSaving(true)
+                try {
+                  await onSave(editTitle, editBody)
+                } finally {
+                  setSaving(false)
+                }
+              })()
+            }}
+          >
+            {saving ? '저장 중…' : '저장'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function KanbanBoard({ projectId, open, onClose }: KanbanBoardProps) {
   const [columns, setColumns] = useState<KColumn[]>([])
   const [loading, setLoading] = useState(false)
@@ -429,9 +546,6 @@ export function KanbanBoard({ projectId, open, onClose }: KanbanBoardProps) {
   const [colorMenu, setColorMenu] = useState<ColorMenuState | null>(null)
   const [overlay, setOverlay] = useState<ActiveOverlay>(null)
   const [editing, setEditing] = useState<KCard | null>(null)
-  const [editTitle, setEditTitle] = useState('')
-  const [editBody, setEditBody] = useState('')
-  const [savingEdit, setSavingEdit] = useState(false)
   const pendingNewCardIdRef = useRef<string | null>(null)
 
   const sensors = useSensors(
@@ -508,8 +622,6 @@ export function KanbanBoard({ projectId, open, onClose }: KanbanBoardProps) {
     if (shouldDelete) pendingNewCardIdRef.current = null
     setColorMenu(null)
     setEditing(null)
-    setEditTitle('')
-    setEditBody('')
     if (shouldDelete && card) {
       const supabase = createClient()
       await supabase.from('write_kanban_cards').delete().eq('id', card.id)
@@ -609,8 +721,6 @@ export function KanbanBoard({ projectId, open, onClose }: KanbanBoardProps) {
         prev.map((c) => (c.id === columnId ? { ...c, cards: [...c.cards, card] } : c))
       )
       setEditing(card)
-      setEditTitle(card.title)
-      setEditBody(card.body ?? '')
       pendingNewCardIdRef.current = card.id
     },
     [columns]
@@ -643,33 +753,29 @@ export function KanbanBoard({ projectId, open, onClose }: KanbanBoardProps) {
     pendingNewCardIdRef.current = null
     setColorMenu(null)
     setEditing(card)
-    setEditTitle(card.title)
-    setEditBody(card.body ?? '')
   }, [])
 
-  const saveEdit = useCallback(async () => {
-    if (!editing) return
-    setSavingEdit(true)
-    try {
+  const saveEditFromModal = useCallback(
+    async (title: string, body: string) => {
+      if (!editing) return
       const supabase = createClient()
       await supabase
         .from('write_kanban_cards')
-        .update({ title: editTitle, body: editBody || null })
+        .update({ title, body: body || null })
         .eq('id', editing.id)
       setColumns((prev) =>
         prev.map((c) => ({
           ...c,
           cards: c.cards.map((k) =>
-            k.id === editing.id ? { ...k, title: editTitle, body: editBody || null } : k
+            k.id === editing.id ? { ...k, title, body: body || null } : k
           ),
         }))
       )
       pendingNewCardIdRef.current = null
       setEditing(null)
-    } finally {
-      setSavingEdit(false)
-    }
-  }, [editing, editTitle, editBody])
+    },
+    [editing]
+  )
 
   const openColumnColorMenu = useCallback((e: MouseEvent, columnId: string) => {
     e.preventDefault()
@@ -961,51 +1067,11 @@ export function KanbanBoard({ projectId, open, onClose }: KanbanBoardProps) {
         />
       ) : null}
 
-      {editing ? (
-        <div
-          className="fixed inset-0 z-[540] flex items-center justify-center p-4 modal-overlay-apple"
-          role="presentation"
-          onClick={() => void dismissEditModal()}
-        >
-          <div
-            className="modal-panel-apple w-full max-w-md p-4 shadow-xl"
-            onClick={(ev) => ev.stopPropagation()}
-          >
-            <div className="mb-3 text-sm font-semibold text-[var(--foreground)]">카드 편집</div>
-            <label className="mb-2 block text-xs text-[var(--muted)]">제목</label>
-            <input
-              type="text"
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              className="input-apple mb-3 w-full rounded-md px-3 py-2 text-sm"
-            />
-            <label className="mb-2 block text-xs text-[var(--muted)]">내용</label>
-            <textarea
-              value={editBody}
-              onChange={(e) => setEditBody(e.target.value)}
-              rows={5}
-              className="input-apple mb-4 w-full resize-y rounded-md px-3 py-2 text-sm"
-            />
-            <div className="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                className="btn-apple btn-apple-secondary px-3 py-1.5 text-xs"
-                onClick={() => void dismissEditModal()}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                disabled={savingEdit}
-                className="btn-apple px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
-                onClick={() => void saveEdit()}
-              >
-                {savingEdit ? '저장 중…' : '저장'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <KanbanCardEditModal
+        card={editing}
+        onRequestClose={() => void dismissEditModal()}
+        onSave={(title, body) => saveEditFromModal(title, body)}
+      />
     </div>
   )
 }

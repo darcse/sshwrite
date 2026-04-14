@@ -389,15 +389,25 @@ function ProjectWorkspaceBody({
               borderBottomColor: inspectorTab === 'ai' ? 'var(--foreground)' : 'transparent',
             }}
           >
-            AI
+            Assistant
           </button>
         </div>
-        <div className="min-h-0 flex-1 p-3 text-sm text-[var(--muted)]">
+        <div className="flex min-h-0 flex-1 flex-col p-3 text-sm text-[var(--muted)]">
           <div
             data-inspector-panel-content
-            className={inspectorTab === 'inspector' ? 'h-full overflow-auto' : 'hidden'}
+            className={
+              inspectorTab === 'inspector'
+                ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+                : 'hidden'
+            }
           >
-            <InspectorPanel />
+            <div className="min-h-0 shrink grow-0 overflow-y-auto pb-6">
+              <InspectorPanel />
+            </div>
+            <div
+              data-inspector-meta-mount
+              className="shrink-0 border-t border-[var(--border)] pt-6"
+            />
           </div>
           <div className={inspectorTab === 'ai' ? 'flex h-full min-h-0 flex-col overflow-hidden' : 'hidden'}>
             <AssistantPanel
