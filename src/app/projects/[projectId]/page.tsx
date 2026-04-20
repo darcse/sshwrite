@@ -5,6 +5,7 @@ import { BinderHeaderBar, BinderPanelToggleIcon } from '@/components/binder/Bind
 import { AssistantPanel } from '@/components/assistant/AssistantPanel'
 import { EditorPanel } from '@/components/editor/EditorPanel'
 import { InspectorPanel } from '@/components/editor/InspectorPanel'
+import { IdeaBoard } from '@/components/editor/IdeaBoard'
 import { ProjectHeader } from '@/components/editor/ProjectHeader'
 import { createClient } from '@/lib/supabase/client'
 import { tiptapToPlainText } from '@/lib/doc-utils'
@@ -277,10 +278,14 @@ function ProjectWorkspaceBody({
   const { documents, selectedDocId } = useBinderContext()
   const selectedDoc = selectedDocId ? documents.find((d) => d.id === selectedDocId) : undefined
   const selectedDocText = selectedDoc?.type === 'document' ? tiptapToPlainText(selectedDoc.content) : ''
+  const [ideaBoardOpen, setIdeaBoardOpen] = useState(false)
   return (
     <>
     <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden border-t border-[var(--border)] bg-[var(--card-bg)]">
-      <ProjectHeader projectId={projectId} />
+      <ProjectHeader
+        projectId={projectId}
+        onOpenIdeaBoard={() => setIdeaBoardOpen(true)}
+      />
       <div
         ref={containerRef}
         className="flex h-full min-h-0 w-full flex-1 flex-col md:flex-row md:overflow-hidden"
@@ -419,6 +424,7 @@ function ProjectWorkspaceBody({
       </aside>
       </div>
     </div>
+    <IdeaBoard projectId={projectId} open={ideaBoardOpen} onClose={() => setIdeaBoardOpen(false)} />
     </>
   )
 }

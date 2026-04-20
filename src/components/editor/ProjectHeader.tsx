@@ -1,15 +1,20 @@
 'use client'
 
-import { ScratchpadPanel } from '@/components/editor/ScratchpadPanel'
 import { StoryBiblePanel } from '@/components/editor/StoryBiblePanel'
 import { CommandPalette } from '@/components/editor/CommandPalette'
 import { KanbanBoard } from '@/components/editor/KanbanBoard'
 import { StatsModal } from '@/components/editor/StatsModal'
 import { useBinderContext } from '@/components/binder/BinderTree'
-import { ChartColumn, LayoutGrid, Search } from 'lucide-react'
+import { ChartColumn, LayoutGrid, Lightbulb, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
-export function ProjectHeader({ projectId }: { projectId: string }) {
+export function ProjectHeader({
+  projectId,
+  onOpenIdeaBoard,
+}: {
+  projectId: string
+  onOpenIdeaBoard?: () => void
+}) {
   const { projectTitle, projectType } = useBinderContext()
   const [statsOpen, setStatsOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -63,7 +68,17 @@ export function ProjectHeader({ projectId }: { projectId: string }) {
             <ChartColumn className="h-5 w-5" strokeWidth={2} aria-hidden />
           </button>
           <StoryBiblePanel projectId={projectId} />
-          <ScratchpadPanel projectId={projectId} />
+          {projectType === 'novel' && onOpenIdeaBoard ? (
+            <button
+              type="button"
+              onClick={onOpenIdeaBoard}
+              className="shrink-0 rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
+              aria-label="아이디어 보드"
+              title="아이디어 보드"
+            >
+              <Lightbulb className="h-5 w-5" strokeWidth={2} aria-hidden />
+            </button>
+          ) : null}
         </div>
       </div>
       <StatsModal projectId={projectId} open={statsOpen} onClose={() => setStatsOpen(false)} />
