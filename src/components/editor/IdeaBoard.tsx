@@ -235,6 +235,7 @@ export function IdeaBoard({
           setAiErr={setAiErr}
           setPermanent={setPermanent}
           setIdeas={setIdeas}
+          permanent={permanent}
         />
       ) : null}
     </div>

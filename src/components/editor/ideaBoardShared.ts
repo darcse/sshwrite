@@ -76,10 +76,73 @@ export function nextIndependentNoteNumber(existing: Iterable<string>): string {
   return String(mx + 1).padStart(4, '0')
 }
 
-export function resolveNoteNumberFromApi(candidate: string, existingNoteNumbers: Set<string>): string {
-  const c = candidate.trim()
-  if (c && !existingNoteNumbers.has(c)) return c
-  return nextIndependentNoteNumber(existingNoteNumbers)
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+export function nextNoteNumberForCreate(
+  parentNoteNumber: string | null | undefined,
+  existingNoteNumbers: Iterable<string>,
+  excludeNoteNumbers?: Iterable<string> | null
+): string {
+  const exclude = new Set(
+    [...(excludeNoteNumbers ?? [])]
+      .map((n) => (typeof n === 'string' ? n.trim() : ''))
+      .filter(Boolean)
+  )
+  const existing = new Set(
+    [...existingNoteNumbers]
+      .map((n) => (typeof n === 'string' ? n.trim() : ''))
+      .filter(Boolean)
+      .filter((n) => !exclude.has(n))
+  )
+  if (!parentNoteNumber || !String(parentNoteNumber).trim()) {
+    return nextIndependentNoteNumber(existing)
+  }
+  const P = String(parentNoteNumber).trim()
+  const last = P[P.length - 1] ?? ''
+  const lastIsDigit = /[0-9]/.test(last)
+  const lastIsLetter = /[a-zA-Z]/.test(last)
+
+  if (lastIsDigit) {
+    const re = new RegExp(`^${escapeRegExp(P)}([a-z])$`, 'i')
+    let maxCode = 96
+    for (const n of existing) {
+      const m = n.match(re)
+      if (m) {
+        const code = m[1].toLowerCase().charCodeAt(0)
+        if (code > maxCode) maxCode = code
+      }
+    }
+    if (maxCode < 97) return P + 'a'
+    const nextCode = maxCode + 1
+    if (nextCode <= 122) return P + String.fromCharCode(nextCode)
+    let maxTail = 0
+    const reZ = new RegExp(`^${escapeRegExp(P)}z(\\d+)$`)
+    for (const n of existing) {
+      const m = n.match(reZ)
+      if (m) {
+        const v = parseInt(m[1], 10)
+        if (Number.isFinite(v) && v > maxTail) maxTail = v
+      }
+    }
+    return P + 'z' + String(maxTail + 1)
+  }
+
+  if (lastIsLetter) {
+    const re = new RegExp(`^${escapeRegExp(P)}(\\d+)$`)
+    let maxNum = 0
+    for (const n of existing) {
+      const m = n.match(re)
+      if (m) {
+        const v = parseInt(m[1], 10)
+        if (Number.isFinite(v) && v > maxNum) maxNum = v
+      }
+    }
+    return P + String(maxNum + 1)
+  }
+
+  return nextIndependentNoteNumber(existing)
 }
 
 export function normalizeSections(

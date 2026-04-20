@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/client'
 import {
   isWritePermanentSectionsUnavailable,
+  nextNoteNumberForCreate,
   normalizeSections,
   parsePermanentRow,
   PERMANENT_SECTION_KEYS,
@@ -15,6 +16,7 @@ import type {
   PermFormState,
 } from '@/components/editor/ideaBoardShared'
 import { X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 
 export function PermanentCardModal({
@@ -25,6 +27,7 @@ export function PermanentCardModal({
   setAiErr,
   setPermanent,
   setIdeas,
+  permanent,
 }: {
   projectId: string
   permForm: PermFormState
@@ -33,7 +36,47 @@ export function PermanentCardModal({
   setAiErr: Dispatch<SetStateAction<string | null>>
   setPermanent: Dispatch<SetStateAction<PermanentCardRow[]>>
   setIdeas: Dispatch<SetStateAction<IdeaCardRow[]>>
+  permanent: PermanentCardRow[]
 }) {
+  const [parentId, setParentId] = useState<string | null>(null)
+  const [parentNoteNumber, setParentNoteNumber] = useState<string | null>(null)
+
+  const sortedForParent = useMemo(
+    () =>
+      [...permanent].sort((a, b) =>
+        a.note_number.localeCompare(b.note_number, undefined, { numeric: true })
+      ),
+    [permanent]
+  )
+
+  const parentResetKey =
+    permForm.mode === 'create' ? permForm.ideaId : permForm.mode === 'edit' ? permForm.id : ''
+  useEffect(() => {
+    setParentId(null)
+    setParentNoteNumber(null)
+  }, [permForm.mode, parentResetKey])
+
+  const parentOptions = useMemo(() => {
+    if (permForm.mode === 'edit') {
+      return sortedForParent.filter((c) => c.id !== permForm.id)
+    }
+    return sortedForParent
+  }, [sortedForParent, permForm.mode, permForm.mode === 'edit' ? permForm.id : ''])
+
+  function applyParent(id: string | null) {
+    setParentId(id)
+    const row = id ? sortedForParent.find((c) => c.id === id) : undefined
+    const pnn = row?.note_number?.trim() ? row.note_number.trim() : null
+    setParentNoteNumber(pnn)
+    const allNums = permanent.map((c) => c.note_number.trim()).filter(Boolean)
+    const savedSelfNn =
+      permForm.mode === 'edit'
+        ? permanent.find((c) => c.id === permForm.id)?.note_number?.trim() ?? ''
+        : ''
+    const exclude = savedSelfNn ? [savedSelfNn] : undefined
+    const nn = nextNoteNumberForCreate(pnn, allNums, exclude)
+    setPermForm((p) => (p ? { ...p, note_number: nn } : p))
+  }
   function closeModal() {
     setPermForm(null)
     setAiErr(null)
@@ -130,11 +173,12 @@ export function PermanentCardModal({
         )
       }
     } else {
+      const typeForDb = typeStringForPermanentInsert(permForm.type)
       let { error } = await supabase
         .from('write_permanent_cards')
         .update({
           note_number: nn,
-          type: permForm.type,
+          type: typeForDb,
           title: tt,
           sections: permForm.sections,
         })
@@ -145,7 +189,7 @@ export function PermanentCardModal({
           .from('write_permanent_cards')
           .update({
             note_number: nn,
-            type: permForm.type,
+            type: typeForDb,
             title: tt,
           })
           .eq('id', permForm.id)
@@ -232,44 +276,66 @@ export function PermanentCardModal({
           </p>
         ) : null}
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-          <label className="block text-sm text-[var(--muted)]">
-            note_number
-            <input
-              type="text"
-              value={permForm.note_number}
-              onChange={(e) =>
-                setPermForm((p) => (p ? { ...p, note_number: e.target.value } : p))
-              }
-              className="input-apple mt-1.5 w-full px-3 py-2.5 text-base"
-            />
-          </label>
-          <label className="block text-sm text-[var(--muted)]">
-            타입
-            <select
-              value={permForm.type}
-              onChange={(e) => {
-                const nextType = e.target.value as PermanentCardType
-                setPermForm((p) =>
-                  p
-                    ? {
-                        ...p,
-                        type: nextType,
-                        sections: normalizeSections(
-                          nextType,
-                          p.sections as unknown as Record<string, unknown>
-                        ),
-                      }
-                    : p
-                )
-              }}
-              className="select-apple mt-1.5 w-full px-3 py-2.5 text-base"
-            >
-              <option value="event">사건</option>
-              <option value="character">캐릭터</option>
-              <option value="worldview">세계관</option>
-              <option value="place">장소</option>
-            </select>
-          </label>
+          <div className="flex shrink-0 flex-nowrap items-end gap-3 overflow-x-auto pb-0.5">
+            <label className="flex min-w-0 flex-1 flex-col text-sm text-[var(--muted)]">
+              부모 카드 선택
+              <select
+                key="perm-modal-parent"
+                value={parentId ?? ''}
+                onChange={(e) => {
+                  const v = e.target.value
+                  applyParent(v === '' ? null : v)
+                }}
+                className="select-apple mt-1.5 box-border h-11 w-full min-w-[10rem] px-3 py-0 text-base leading-[2.75rem]"
+              >
+                <option value="">선택 안 함</option>
+                {parentOptions.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.note_number} {c.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex w-[7.5rem] shrink-0 flex-col text-sm text-[var(--muted)] sm:w-32">
+              note_number
+              <input
+                type="text"
+                value={permForm.note_number}
+                onChange={(e) =>
+                  setPermForm((p) => (p ? { ...p, note_number: e.target.value } : p))
+                }
+                className="input-apple mt-1.5 box-border h-11 w-full px-3 py-0 text-base leading-[2.75rem]"
+              />
+            </label>
+            <label className="flex w-[6.75rem] shrink-0 flex-col text-sm text-[var(--muted)] sm:w-36">
+              타입
+              <select
+                key="perm-modal-type"
+                value={permForm.type}
+                onChange={(e) => {
+                  const nextType = e.target.value as PermanentCardType
+                  setPermForm((p) =>
+                    p
+                      ? {
+                          ...p,
+                          type: nextType,
+                          sections: normalizeSections(
+                            nextType,
+                            p.sections as unknown as Record<string, unknown>
+                          ),
+                        }
+                      : p
+                  )
+                }}
+                className="select-apple mt-1.5 box-border h-11 w-full px-3 py-0 text-base leading-[2.75rem]"
+              >
+                <option value="event">사건</option>
+                <option value="character">캐릭터</option>
+                <option value="worldview">세계관</option>
+                <option value="place">장소</option>
+              </select>
+            </label>
+          </div>
           <label className="block text-sm text-[var(--muted)]">
             제목
             <input

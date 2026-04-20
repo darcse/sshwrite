@@ -6,7 +6,7 @@ import type {
   PermFormState,
   PermanentCardType,
 } from '@/components/editor/ideaBoardShared'
-import { normalizeSections, resolveNoteNumberFromApi } from '@/components/editor/ideaBoardShared'
+import { nextIndependentNoteNumber, normalizeSections } from '@/components/editor/ideaBoardShared'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { useMemo } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
@@ -158,8 +158,7 @@ export function IdeaCardList({
         return
       }
       const sections = normalizeSections(ct, data.sections as Record<string, unknown> | undefined)
-      const rawCand = String(data.id ?? data.note_number ?? '').trim()
-      const nn = resolveNoteNumberFromApi(rawCand, existingNoteSet)
+      const nn = nextIndependentNoteNumber(existingNoteSet)
       setPermForm({
         mode: 'create',
         ideaId: it.id,
