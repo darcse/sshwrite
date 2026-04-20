@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/client'
 import {
   isWritePermanentSectionsUnavailable,
+  nextIndependentNoteNumber,
   nextNoteNumberForCreate,
   normalizeSections,
   parsePermanentRow,
@@ -44,6 +45,9 @@ export function PermanentCardModal({
 }) {
   const [parentId, setParentId] = useState<string | null>(null)
   const [parentNoteNumber, setParentNoteNumber] = useState<string | null>(null)
+  const [mergeOpen, setMergeOpen] = useState(false)
+  const [mergeSelectedIds, setMergeSelectedIds] = useState<string[]>([])
+  const [mergeLoading, setMergeLoading] = useState(false)
 
   const sortedForParent = useMemo(
     () =>
@@ -82,6 +86,24 @@ export function PermanentCardModal({
     return sortedForParent
   }, [sortedForParent, permForm.mode, permForm.mode === 'edit' ? permForm.id : ''])
 
+  const mergeCards = useMemo(() => {
+    if (permForm.mode !== 'edit') return []
+    return sortedForParent
+  }, [permForm.mode, sortedForParent])
+
+  const mergeResetKey = permForm.mode === 'edit' ? permForm.id : permForm.mode
+  useEffect(() => {
+    if (permForm.mode !== 'edit') {
+      setMergeOpen(false)
+      setMergeSelectedIds([])
+      return
+    }
+    setMergeSelectedIds((prev) => {
+      const next = prev.filter((id) => id !== permForm.id)
+      return [permForm.id, ...next]
+    })
+  }, [permForm.mode, mergeResetKey])
+
   function applyParent(id: string | null) {
     setParentId(id)
     const row = id ? sortedForParent.find((c) => c.id === id) : undefined
@@ -100,6 +122,78 @@ export function PermanentCardModal({
     setPermForm(null)
     setAiErr(null)
     if (isInline) setSelectedCard?.(null)
+  }
+
+  function toggleMergeSelection(id: string, checked: boolean) {
+    if (permForm.mode !== 'edit') return
+    if (id === permForm.id) return
+    setMergeSelectedIds((prev) => {
+      if (checked) {
+        if (prev.includes(id)) return prev
+        return [...prev, id]
+      }
+      return prev.filter((x) => x !== id)
+    })
+  }
+
+  async function mergeSelectedCards() {
+    if (permForm.mode !== 'edit') return
+    const picked = mergeCards.filter((c) => mergeSelectedIds.includes(c.id))
+    if (picked.length < 2) return
+    setMergeLoading(true)
+    setAiErr(null)
+    try {
+      const existingCards = sortedForParent.map((r) => ({
+        note_number: r.note_number,
+        type: r.type,
+        title: r.title,
+      }))
+      const res = await fetch('/api/merge-permanent-cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cards: picked,
+          existingCards,
+          projectId,
+        }),
+      })
+      const data = (await res.json()) as {
+        error?: string
+        id?: string
+        note_number?: string
+        type?: string
+        title?: string
+        sections?: Record<string, string>
+      }
+      if (!res.ok) {
+        setAiErr(data.error || '요청에 실패했습니다.')
+        return
+      }
+      const ct = data.type as PermanentCardType
+      if (!['event', 'character', 'worldview', 'place'].includes(ct)) {
+        setAiErr('응답 형식이 올바르지 않습니다.')
+        return
+      }
+      const sections = normalizeSections(ct, data.sections as Record<string, unknown> | undefined)
+      const existingNoteSet = new Set(
+        existingCards.map((x) => x.note_number).filter((n) => n.length > 0)
+      )
+      const nn = nextIndependentNoteNumber(existingNoteSet)
+      setMergeOpen(false)
+      setMergeSelectedIds([])
+      setPermForm({
+        mode: 'create',
+        ideaId: '',
+        note_number: nn,
+        type: ct,
+        title: String(data.title ?? '').trim(),
+        sections,
+      })
+    } catch {
+      setAiErr('요청 처리 중 오류가 발생했습니다.')
+    } finally {
+      setMergeLoading(false)
+    }
   }
 
   async function savePermForm() {
@@ -164,33 +258,35 @@ export function PermanentCardModal({
         )
       }
       const ideaRowId = String(permForm.ideaId).trim()
-      const { data: ideaUpd, error: ue } = await supabase
-        .from('write_idea_cards')
-        .update({ status: 'converted' })
-        .eq('id', ideaRowId)
-        .eq('user_id', user.id)
-        .select('id')
-      if (ue) {
-        ideaArchiveErr = ue
-        console.log('write_idea_cards update error', {
-          message: ue.message,
-          code: ue.code,
-          details: ue.details,
-          hint: ue.hint,
-        })
-        setAiErr(
-          ue.message
-            ? `아이디어 카드를 아카이브하지 못했습니다: ${ue.message}`
-            : '아이디어 카드를 아카이브하지 못했습니다.'
-        )
-      } else if (!ideaUpd || ideaUpd.length === 0) {
-        ideaArchiveErr = { message: 'no rows' }
-        console.error('write_idea_cards update: 0 rows', ideaRowId, { userId: user.id })
-        setAiErr('아이디어 카드를 아카이브하지 못했습니다.')
-      } else {
-        setIdeas((prev) =>
-          prev.map((i) => (i.id === ideaRowId ? { ...i, status: 'converted' as const } : i))
-        )
+      if (ideaRowId) {
+        const { data: ideaUpd, error: ue } = await supabase
+          .from('write_idea_cards')
+          .update({ status: 'converted' })
+          .eq('id', ideaRowId)
+          .eq('user_id', user.id)
+          .select('id')
+        if (ue) {
+          ideaArchiveErr = ue
+          console.log('write_idea_cards update error', {
+            message: ue.message,
+            code: ue.code,
+            details: ue.details,
+            hint: ue.hint,
+          })
+          setAiErr(
+            ue.message
+              ? `아이디어 카드를 아카이브하지 못했습니다: ${ue.message}`
+              : '아이디어 카드를 아카이브하지 못했습니다.'
+          )
+        } else if (!ideaUpd || ideaUpd.length === 0) {
+          ideaArchiveErr = { message: 'no rows' }
+          console.error('write_idea_cards update: 0 rows', ideaRowId, { userId: user.id })
+          setAiErr('아이디어 카드를 아카이브하지 못했습니다.')
+        } else {
+          setIdeas((prev) =>
+            prev.map((i) => (i.id === ideaRowId ? { ...i, status: 'converted' as const } : i))
+          )
+        }
       }
     } else {
       const typeForDb = typeStringForPermanentInsert(permForm.type)
@@ -415,13 +511,24 @@ export function PermanentCardModal({
         <div className="flex shrink-0 items-center justify-between gap-2 border-t border-[var(--border)] pt-4">
           <div>
             {permForm.mode === 'edit' ? (
-              <button
-                type="button"
-                onClick={() => void deletePermanentCard()}
-                className="rounded-lg px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-500/10"
-              >
-                삭제
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMergeOpen((v) => !v)}
+                  className="btn-apple btn-apple-secondary rounded-lg px-3 py-2 text-sm font-semibold"
+                  disabled={mergeLoading}
+                >
+                  카드 합성
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void deletePermanentCard()}
+                  className="rounded-lg px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-500/10"
+                  disabled={mergeLoading}
+                >
+                  삭제
+                </button>
+              </div>
             ) : null}
           </div>
           <div className="flex gap-2">
@@ -441,6 +548,38 @@ export function PermanentCardModal({
             </button>
           </div>
         </div>
+        {permForm.mode === 'edit' && mergeOpen ? (
+          <div className="shrink-0 space-y-2 rounded-lg border border-[var(--border)] bg-[var(--card-bg)] p-3">
+            <div className="max-h-44 space-y-1 overflow-y-auto">
+              {mergeCards.map((c) => {
+                const checked = mergeSelectedIds.includes(c.id)
+                const fixed = c.id === permForm.id
+                return (
+                  <label key={c.id} className="flex items-center gap-2 text-sm text-[var(--foreground)]">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={fixed || mergeLoading}
+                      onChange={(e) => toggleMergeSelection(c.id, e.target.checked)}
+                    />
+                    <span className="text-xs text-[var(--muted)]">{c.note_number}</span>
+                    <span className="truncate">{c.title}</span>
+                  </label>
+                )
+              })}
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => void mergeSelectedCards()}
+                disabled={mergeLoading || mergeSelectedIds.length < 2}
+                className="btn-apple btn-apple-primary rounded-lg px-4 py-2 text-sm font-semibold disabled:pointer-events-none disabled:opacity-45"
+              >
+                {mergeLoading ? '합성 중...' : '합성'}
+              </button>
+            </div>
+          </div>
+        ) : null}
     </>
   )
 
