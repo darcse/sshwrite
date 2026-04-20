@@ -1,7 +1,7 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
-import { ScrollText, X } from 'lucide-react'
+import { FileText, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 export function StoryBiblePanel({ projectId }: { projectId: string }) {
@@ -71,11 +71,11 @@ export function StoryBiblePanel({ projectId }: { projectId: string }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="shrink-0 rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
+        className="inline-flex shrink-0 items-center justify-center rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
         aria-label="스토리 바이블"
         title="스토리 바이블"
       >
-        <ScrollText className="h-5 w-5" strokeWidth={2} aria-hidden />
+        <FileText className="h-5 w-5 translate-y-px" strokeWidth={2} aria-hidden />
       </button>
       {open ? (
         <div

@@ -94,6 +94,7 @@ export function InspectorPanel() {
         .eq('user_id', user.id)
       if (error) {
         console.error('memo 저장 실패', error)
+        setPermModalErr('메모 저장에 실패했습니다.')
       } else {
         await refresh()
       }

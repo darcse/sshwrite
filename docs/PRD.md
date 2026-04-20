@@ -80,6 +80,7 @@
 - 문서 상태 변경: 예정 / 작성 중 / 완료
 - 라벨 생성/수정/삭제 (컬러 선택 + 이름 입력)
 - 메모 편집 (debounce 자동 저장)
+- 관련 Permanent 카드 연결/해제 (write_permanent_card_documents 조인 테이블)
 
 ### 3.6 코르크보드
 
@@ -103,21 +104,46 @@
 - 5가지 모드: chat(대화), ideas(아이디어 5개 제안), polish(문장 다듬기), continue(이어쓰기), summarize(요약)
 - 현재 문서 내용을 컨텍스트로 전달
 - 프로젝트 타입(소설/가사) 별 시스템 프롬프트 분기
+- Show Don't Tell (Editor.tsx): 선택 텍스트를 감각적 묘사로 변환 (`/api/show-dont-tell`)
+- 프로젝트 세계관 컨텍스트(worldview_context)를 AI 프롬프트에 자동 주입 (`prependWorldviewToSystem`)
 
-### 3.9 컴파일 / 내보내기
+### 3.9 스토리 바이블
+
+- 프로젝트 단위 세계관/설정 메모 (`worldview_context` 컬럼, debounce 자동 저장)
+- 헤더 아이콘으로 접근하는 슬라이드 패널 (`StoryBiblePanel.tsx`)
+- 저장된 내용은 AI 어시스턴트·캐릭터 인터뷰·이벤트 생성 등 모든 AI 호출에 컨텍스트로 주입
+
+### 3.10 캐릭터 인터뷰 (novel 타입 전용)
+
+- 캐릭터 모달에서 'AI 인터뷰' 버튼 클릭 시 캐릭터에 대한 질문-답변 생성 (`/api/character-interview`)
+- 세계관 컨텍스트 반영
+
+### 3.11 아이디어 보드 (novel 타입 전용)
+
+- 풀스크린 오버레이 3단 레이아웃: 아이디어 카드 목록 | Permanent 카드 트리 | 카드 상세
+- **아이디어 카드** (`write_idea_cards`): 자유 텍스트 입력, 삭제, 활성/아카이브 필터
+- **AI Permanent 카드 생성** (`/api/generate-permanent-card`): 아이디어를 4타입(사건/캐릭터/세계관/장소) 중 하나의 구조화된 카드로 변환
+- **Permanent 카드** (`write_permanent_cards`): Zettelkasten Folgezettel 번호 체계, 타입별 섹션 구조
+- **카드 합성** (`/api/merge-permanent-cards`): 복수 카드 선택 후 Claude가 통합 카드 생성
+- **타입별 내보내기**: 사건→칸반 카드, 캐릭터/장소→write_characters, `exported_at` 중복 방지
+- **인스펙터 연동**: 문서에 Permanent 카드 연결 (`write_permanent_card_documents`)
+- Permanent 카드 트리: 타입 필터, Folgezettel 계층 트리 렌더링, 너비 드래그 조절
+- 아이디어 카드 변환 시 자동 아카이브 (status='converted')
+
+### 3.12 컴파일 / 내보내기
 
 - 문서 포함/제외 선택
 - 포함 문서 순서 드래그앤드롭 조정
 - Markdown 다운로드 (.md)
 - Word 다운로드 (.docx): 폴더 계층 → 제목 레벨, 서식 보존
 
-### 3.10 집필 통계
+### 3.13 집필 통계
 
 - 프로젝트 전체 단어 수
 - 문서 수
 - 완료 비율 (done 문서 / 전체)
 
-### 3.11 포모도로 타이머
+### 3.14 포모도로 타이머
 
 - 기본 25분 집필 + 5분 휴식
 - 시간 설정 변경 가능 (집필 1~60분, 휴식 1~30분)
@@ -125,14 +151,15 @@
 - 단계 전환 시 브라우저 알림
 - 완료한 포모도로 횟수 표시
 
-### 3.12 플롯 칸반 보드 (novel 타입 전용)
+### 3.15 플롯 칸반 보드 (novel 타입 전용)
 
 - 프로젝트 헤더 아이콘으로 열리는 풀스크린 오버레이
 - 챕터/막 단위 컬럼 추가 및 삭제
 - 컬럼 안에 사건 카드 추가
+- AI 이벤트 생성 (`/api/generate-event`): 세계관 컨텍스트 반영하여 카드 내용 자동 생성
 - 카드 드래그: 같은 컬럼 내 순서 변경 및 다른 컬럼으로 이동
 - 컬럼 드래그: 컬럼 순서 변경
-- 데이터 Supabase DB 저장 (새로고침 후 유지)
+- 데이터 Supabase DB 저장 (`write_kanban_columns`, `write_kanban_cards`)
 - lyrics 타입 프로젝트에서는 헤더 아이콘 미노출
 
 ---
@@ -151,6 +178,7 @@
 | cover_color | text | 커버 컬러 (nullable) |
 | cover_image_url | text | 커버 이미지 URL (nullable) |
 | scratch_content | text | 스크래치패드 내용 (nullable) |
+| worldview_context | text | 스토리 바이블 세계관 컨텍스트 (nullable) |
 | created_at | timestamp | |
 | updated_at | timestamp | |
 
@@ -209,6 +237,44 @@
 | content | JSONB | Tiptap JSONContent 형식 |
 | created_at | timestamp | |
 
+### `write_idea_cards`
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | UUID | PK |
+| project_id | UUID | write_projects FK |
+| user_id | UUID | auth.users FK |
+| content | text | 아이디어 내용 |
+| status | text | 'pending' \| 'converted' |
+| created_at | timestamp | |
+
+### `write_permanent_cards`
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | UUID | PK |
+| project_id | UUID | write_projects FK |
+| user_id | UUID | auth.users FK |
+| note_number | text | Folgezettel 번호 (0001, 0001a, …) |
+| type | text | 'event' \| 'character' \| 'worldview' \| 'place' |
+| title | text | 카드 제목 |
+| sections | JSONB | 타입별 섹션 내용 |
+| exported_at | timestamp | 내보내기 일시 (nullable) |
+| created_at | timestamp | |
+
+### `write_permanent_card_documents`
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | UUID | PK |
+| card_id | UUID | write_permanent_cards FK |
+| document_id | UUID | write_documents FK |
+| user_id | UUID | auth.users FK |
+
+### `write_kanban_columns` / `write_kanban_cards`
+
+칸반 보드 컬럼 및 카드. `write_kanban_columns`: project_id, title, order_index. `write_kanban_cards`: column_id, title, content, order_index.
+
 ### Storage Buckets
 
 | 버킷 | 경로 패턴 | 용도 |
@@ -227,9 +293,14 @@ src/
 │   ├── (auth)/login/page.tsx           # 로그인
 │   ├── projects/[projectId]/page.tsx   # 프로젝트 워크스페이스 (레이아웃, 패널 관리)
 │   └── api/
-│       ├── assistant/route.ts          # AI 어시스턴트 (chat/ideas/polish/continue/summarize)
-│       ├── summarize/route.ts          # 시놉시스 자동 생성
-│       └── generate-character/route.ts # 캐릭터·장소 이름/설명 AI 제너레이터
+│       ├── assistant/route.ts              # AI 어시스턴트 (chat/ideas/polish/continue/summarize)
+│       ├── summarize/route.ts              # 시놉시스 자동 생성
+│       ├── generate-character/route.ts     # 캐릭터·장소 이름/설명 AI 제너레이터
+│       ├── character-interview/route.ts    # 캐릭터 인터뷰 AI
+│       ├── show-dont-tell/route.ts         # Show Don't Tell 변환 AI
+│       ├── generate-event/route.ts         # 칸반 사건 카드 AI 생성
+│       ├── generate-permanent-card/route.ts # 아이디어 → Permanent 카드 변환
+│       └── merge-permanent-cards/route.ts  # Permanent 카드 합성
 │
 ├── components/
 │   ├── binder/
@@ -241,20 +312,26 @@ src/
 │   │   └── CharacterModal.tsx          # 캐릭터/장소 생성/수정 모달
 │   │
 │   ├── editor/
-│   │   ├── Editor.tsx                  # Tiptap 에디터 코어 (자동저장, 단어수, 포커스모드)
+│   │   ├── Editor.tsx                  # Tiptap 에디터 코어 (자동저장, 단어수, 포커스모드, Show Don't Tell)
 │   │   ├── EditorPanel.tsx             # 에디터 패널 (헤더 툴바, 스크롤 컨테이너, 타자기 스크롤 제어)
 │   │   ├── EditorToolbar.tsx           # 서식 도구바
-│   │   ├── ProjectHeader.tsx           # 프로젝트 헤더 (제목, 통계/칸반/컴파일/스크래치패드 버튼)
-│   │   ├── InspectorPanel.tsx          # 인스펙터 패널 (시놉시스/상태/라벨/스냅샷/메모)
+│   │   ├── ProjectHeader.tsx           # 프로젝트 헤더 (제목, 통계/칸반/아이디어보드/컴파일/스크래치패드 버튼)
+│   │   ├── InspectorPanel.tsx          # 인스펙터 패널 (시놉시스/상태/라벨/스냅샷/메모/관련카드)
 │   │   ├── TypewriterScrollExtension.ts # ProseMirror 타자기 스크롤 Extension
 │   │   ├── FindReplacePanel.tsx        # 찾기/바꾸기 패널
 │   │   ├── CommandPalette.tsx          # 전문 검색 팔레트 (Cmd+K)
 │   │   ├── SnapshotPanel.tsx           # 스냅샷 관리 패널
 │   │   ├── ScratchpadPanel.tsx         # 스크래치패드 패널
+│   │   ├── StoryBiblePanel.tsx         # 스토리 바이블 (세계관 컨텍스트 편집)
 │   │   ├── CompileModal.tsx            # 컴파일/내보내기 모달
 │   │   ├── ReadingMode.tsx             # 읽기 모드 패널
-│   │   ├── KanbanBoard.tsx             # 플롯 칸반 보드 (novel 전용)
-│   │   └── StatsModal.tsx              # 집필 통계 모달
+│   │   ├── KanbanBoard.tsx             # 플롯 칸반 보드 (novel 전용, AI 이벤트 생성 포함)
+│   │   ├── StatsModal.tsx              # 집필 통계 모달
+│   │   ├── IdeaBoard.tsx               # 아이디어 보드 오버레이 (novel 전용)
+│   │   ├── IdeaCardList.tsx            # 아이디어 카드 목록 패널
+│   │   ├── PermanentCardList.tsx       # Permanent 카드 Zettelkasten 트리
+│   │   ├── PermanentCardModal.tsx      # Permanent 카드 생성/편집/합성/내보내기 모달
+│   │   └── ideaBoardShared.ts          # 아이디어 보드 공유 타입·유틸 (parsePermanentRow, buildZettelkastenTree 등)
 │   │
 │   ├── corkboard/
 │   │   ├── Corkboard.tsx               # 폴더 내 문서 카드 그리드
@@ -271,6 +348,9 @@ src/
 └── lib/
     ├── doc-utils.ts                    # 공통 유틸 (sortByOrder, getChildren, tiptapToPlainText)
     ├── workspace-layout.ts             # 레이아웃 상수·타입·유틸 (DEFAULT_BINDER, clampBinder 등)
+    ├── ai-system-prompt.ts             # AI 시스템 프롬프트 유틸 (prependWorldviewToSystem)
+    ├── fetch-worldview-context.ts      # 세계관 컨텍스트 서버사이드 조회
+    ├── permanent-card-utils.ts         # Permanent 카드 공유 유틸 (SECTION_KEYS, normalizePayload 등)
     └── supabase/
         ├── client.ts                   # 브라우저 Supabase 클라이언트
         └── server.ts                   # 서버 Supabase 클라이언트 (쿠키 기반)

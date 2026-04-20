@@ -47,27 +47,6 @@ export function ProjectHeader({
           >
             <Search className="h-5 w-5" strokeWidth={2} aria-hidden />
           </button>
-          {projectType === 'novel' ? (
-            <button
-              type="button"
-              onClick={() => setKanbanOpen(true)}
-              className="shrink-0 rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
-              aria-label="플롯 칸반"
-              title="플롯 칸반"
-            >
-              <LayoutGrid className="h-5 w-5" strokeWidth={2} aria-hidden />
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => setStatsOpen(true)}
-            className="shrink-0 rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
-            aria-label="집필 통계"
-            title="집필 통계"
-          >
-            <ChartColumn className="h-5 w-5" strokeWidth={2} aria-hidden />
-          </button>
-          <StoryBiblePanel projectId={projectId} />
           {projectType === 'novel' && onOpenIdeaBoard ? (
             <button
               type="button"
@@ -79,6 +58,27 @@ export function ProjectHeader({
               <Lightbulb className="h-5 w-5" strokeWidth={2} aria-hidden />
             </button>
           ) : null}
+          {projectType === 'novel' ? (
+            <button
+              type="button"
+              onClick={() => setKanbanOpen(true)}
+              className="shrink-0 rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
+              aria-label="플롯 칸반"
+              title="플롯 칸반"
+            >
+              <LayoutGrid className="h-5 w-5" strokeWidth={2} aria-hidden />
+            </button>
+          ) : null}
+          <StoryBiblePanel projectId={projectId} />
+          <button
+            type="button"
+            onClick={() => setStatsOpen(true)}
+            className="shrink-0 rounded p-1 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
+            aria-label="집필 통계"
+            title="집필 통계"
+          >
+            <ChartColumn className="h-5 w-5" strokeWidth={2} aria-hidden />
+          </button>
         </div>
       </div>
       <StatsModal projectId={projectId} open={statsOpen} onClose={() => setStatsOpen(false)} />

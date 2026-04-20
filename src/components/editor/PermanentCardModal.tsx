@@ -451,7 +451,7 @@ export function PermanentCardModal({
           .select('id')
         if (ue) {
           ideaArchiveErr = ue
-          console.log('write_idea_cards update error', {
+          console.error('write_idea_cards update error', {
             message: ue.message,
             code: ue.code,
             details: ue.details,

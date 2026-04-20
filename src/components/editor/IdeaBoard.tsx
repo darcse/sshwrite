@@ -46,6 +46,7 @@ export function IdeaBoard({
   const [aiErr, setAiErr] = useState<string | null>(null)
   const [permanentTreeWidthPx, setPermanentTreeWidthPx] = useState(PERMANENT_TREE_MIN_PX)
   const permanentTreeResizeRef = useRef<{ startX: number; startW: number } | null>(null)
+  const dragCleanupRef = useRef<(() => void) | null>(null)
 
   const onPermanentTreeResizeMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -65,11 +66,16 @@ export function IdeaBoard({
       }
       const onUp = () => {
         permanentTreeResizeRef.current = null
+        dragCleanupRef.current = null
         window.removeEventListener('mousemove', onMove)
         window.removeEventListener('mouseup', onUp)
       }
       window.addEventListener('mousemove', onMove)
       window.addEventListener('mouseup', onUp)
+      dragCleanupRef.current = () => {
+        window.removeEventListener('mousemove', onMove)
+        window.removeEventListener('mouseup', onUp)
+      }
     },
     [permanentTreeWidthPx]
   )
@@ -84,12 +90,20 @@ export function IdeaBoard({
       setLoadErr('로그인이 필요합니다.')
       return
     }
-    const irStatus = await supabase
-      .from('write_idea_cards')
-      .select('id,content,created_at,status')
-      .eq('project_id', projectId)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+    const [irStatus, prWithSections] = await Promise.all([
+      supabase
+        .from('write_idea_cards')
+        .select('id,content,created_at,status')
+        .eq('project_id', projectId)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('write_permanent_cards')
+        .select('id,note_number,type,title,created_at,exported_at,sections')
+        .eq('project_id', projectId)
+        .eq('user_id', user.id)
+        .order('note_number', { ascending: true }),
+    ])
     const ir =
       irStatus.error && isWriteIdeaStatusColumnUnavailable(irStatus.error)
         ? await supabase
@@ -99,12 +113,6 @@ export function IdeaBoard({
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
         : irStatus
-    const prWithSections = await supabase
-      .from('write_permanent_cards')
-      .select('id,note_number,type,title,created_at,exported_at,sections')
-      .eq('project_id', projectId)
-      .eq('user_id', user.id)
-      .order('note_number', { ascending: true })
     const pr =
       prWithSections.error && isWritePermanentSectionsUnavailable(prWithSections.error)
         ? await supabase
@@ -149,6 +157,10 @@ export function IdeaBoard({
       setPermanent(parsed)
     }
   }, [projectId])
+
+  useEffect(() => {
+    return () => { dragCleanupRef.current?.() }
+  }, [])
 
   useEffect(() => {
     if (!open) {

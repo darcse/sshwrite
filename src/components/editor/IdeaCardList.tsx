@@ -96,6 +96,7 @@ export function IdeaCardList({
       .eq('user_id', user.id)
     if (error) {
       console.warn('write_idea_cards delete', error.message ?? error.code ?? String(error))
+      setLoadErr('아이디어를 삭제하지 못했습니다.')
       return
     }
     setIdeas((prev) => prev.filter((x) => x.id !== id))
