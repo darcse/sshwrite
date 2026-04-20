@@ -60,6 +60,14 @@ export function CharacterPanel() {
   }, [load])
 
   useEffect(() => {
+    const onChanged = () => {
+      void load()
+    }
+    window.addEventListener('write:characters:changed', onChanged)
+    return () => window.removeEventListener('write:characters:changed', onChanged)
+  }, [load])
+
+  useEffect(() => {
     let alive = true
     void (async () => {
       setTypeLoading(true)

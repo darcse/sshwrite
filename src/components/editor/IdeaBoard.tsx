@@ -101,7 +101,7 @@ export function IdeaBoard({
         : irStatus
     const prWithSections = await supabase
       .from('write_permanent_cards')
-      .select('id,note_number,type,title,created_at,sections')
+      .select('id,note_number,type,title,created_at,exported_at,sections')
       .eq('project_id', projectId)
       .eq('user_id', user.id)
       .order('note_number', { ascending: true })
@@ -109,7 +109,7 @@ export function IdeaBoard({
       prWithSections.error && isWritePermanentSectionsUnavailable(prWithSections.error)
         ? await supabase
             .from('write_permanent_cards')
-            .select('id,note_number,type,title,created_at')
+            .select('id,note_number,type,title,created_at,exported_at')
             .eq('project_id', projectId)
             .eq('user_id', user.id)
             .order('note_number', { ascending: true })
@@ -192,6 +192,7 @@ export function IdeaBoard({
       note_number: c.note_number,
       type: c.type,
       title: c.title,
+      exported_at: c.exported_at,
       sections: { ...c.sections },
     })
   }

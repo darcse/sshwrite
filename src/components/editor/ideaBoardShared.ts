@@ -15,6 +15,7 @@ export type PermanentCardRow = {
   type: PermanentCardType
   title: string
   created_at: string
+  exported_at: string | null
   sections: Record<string, string>
 }
 
@@ -33,6 +34,7 @@ export type PermFormState =
       note_number: string
       type: PermanentCardType
       title: string
+      exported_at?: string | null
       sections: Record<string, string>
     }
 
@@ -206,6 +208,7 @@ export function parsePermanentRow(r: Record<string, unknown>): PermanentCardRow 
     type: typ,
     title,
     created_at: typeof r.created_at === 'string' ? r.created_at : '',
+    exported_at: typeof r.exported_at === 'string' ? r.exported_at : null,
     sections,
   }
 }

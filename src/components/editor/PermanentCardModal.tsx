@@ -48,6 +48,10 @@ export function PermanentCardModal({
   const [mergeOpen, setMergeOpen] = useState(false)
   const [mergeSelectedIds, setMergeSelectedIds] = useState<string[]>([])
   const [mergeLoading, setMergeLoading] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [kanbanPickerOpen, setKanbanPickerOpen] = useState(false)
+  const [kanbanColumns, setKanbanColumns] = useState<Array<{ id: string; title: string }>>([])
+  const [selectedKanbanColumnId, setSelectedKanbanColumnId] = useState('')
 
   const sortedForParent = useMemo(
     () =>
@@ -91,6 +95,8 @@ export function PermanentCardModal({
     return sortedForParent
   }, [permForm.mode, sortedForParent])
 
+  const alreadyExported = permForm.mode === 'edit' && !!permForm.exported_at
+
   const mergeResetKey = permForm.mode === 'edit' ? permForm.id : permForm.mode
   useEffect(() => {
     if (permForm.mode !== 'edit') {
@@ -103,6 +109,50 @@ export function PermanentCardModal({
       return [permForm.id, ...next]
     })
   }, [permForm.mode, mergeResetKey])
+
+  useEffect(() => {
+    if (permForm.mode !== 'edit' || permForm.type !== 'event' || !kanbanPickerOpen) return
+    let live = true
+    async function loadColumns() {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
+      const { data, error } = await supabase
+        .from('write_kanban_columns')
+        .select('id,title')
+        .eq('project_id', projectId)
+        .eq('user_id', user.id)
+        .order('order_index', { ascending: true })
+      if (!live) return
+      if (error) {
+        setAiErr('칸반 컬럼을 불러오지 못했습니다.')
+        return
+      }
+      const rows = ((data as Record<string, unknown>[]) ?? []).map((r) => ({
+        id: typeof r.id === 'string' ? r.id : '',
+        title: typeof r.title === 'string' ? r.title : '',
+      }))
+      const filtered = rows.filter((r) => r.id)
+      setKanbanColumns(filtered)
+      if (!selectedKanbanColumnId && filtered.length > 0) {
+        setSelectedKanbanColumnId(filtered[0].id)
+      }
+    }
+    void loadColumns()
+    return () => {
+      live = false
+    }
+  }, [permForm.mode, permForm.type, kanbanPickerOpen, projectId, setAiErr, selectedKanbanColumnId])
+
+  useEffect(() => {
+    if (permForm.mode === 'edit' && permForm.type === 'event' && alreadyExported) {
+      setKanbanPickerOpen(true)
+      return
+    }
+    setKanbanPickerOpen(false)
+  }, [permForm.mode, permForm.type, alreadyExported, permForm.mode === 'edit' ? permForm.id : ''])
 
   function applyParent(id: string | null) {
     setParentId(id)
@@ -122,6 +172,140 @@ export function PermanentCardModal({
     setPermForm(null)
     setAiErr(null)
     if (isInline) setSelectedCard?.(null)
+  }
+
+  async function markExportedAtNow() {
+    if (permForm.mode !== 'edit') return false
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return false
+    const nowIso = new Date().toISOString()
+    const { error } = await supabase
+      .from('write_permanent_cards')
+      .update({ exported_at: nowIso })
+      .eq('id', permForm.id)
+      .eq('user_id', user.id)
+    if (error) {
+      setAiErr(error.message ? `내보내기에 실패했습니다: ${error.message}` : '내보내기에 실패했습니다.')
+      return false
+    }
+    setPermanent((prev) =>
+      prev.map((c) => (c.id === permForm.id ? { ...c, exported_at: nowIso } : c))
+    )
+    setSelectedCard?.((prev) => (prev && prev.id === permForm.id ? { ...prev, exported_at: nowIso } : prev))
+    setPermForm((p) =>
+      p && p.mode === 'edit' && p.id === permForm.id
+        ? { ...p, exported_at: nowIso }
+        : p
+    )
+    return true
+  }
+
+  async function exportToCharacter(kind: 'character' | 'place') {
+    if (permForm.mode !== 'edit' || exporting) return
+    setExporting(true)
+    setAiErr(null)
+    try {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        setAiErr('로그인이 필요합니다.')
+        return
+      }
+      const payload =
+        kind === 'character'
+          ? {
+              project_id: projectId,
+              user_id: user.id,
+              type: 'character',
+              name: permForm.title,
+              description: permForm.sections['인물'] || null,
+              memo: [permForm.sections['욕망'], permForm.sections['갈등']].filter(Boolean).join('\n\n') || null,
+            }
+          : {
+              project_id: projectId,
+              user_id: user.id,
+              type: 'place',
+              name: permForm.title,
+              description: permForm.sections['장소'] || null,
+              memo: [permForm.sections['분위기'], permForm.sections['역할']].filter(Boolean).join('\n\n') || null,
+            }
+      const { data: maxRows } = await supabase
+        .from('write_characters')
+        .select('order_index')
+        .eq('project_id', projectId)
+        .eq('user_id', user.id)
+        .eq('type', kind)
+        .order('order_index', { ascending: false })
+        .limit(1)
+      const nextOrder =
+        maxRows && maxRows.length > 0 && typeof maxRows[0].order_index === 'number'
+          ? maxRows[0].order_index + 1
+          : 0
+      const { error } = await supabase.from('write_characters').insert({
+        ...payload,
+        order_index: nextOrder,
+      })
+      if (error) {
+        setAiErr(error.message ? `내보내기에 실패했습니다: ${error.message}` : '내보내기에 실패했습니다.')
+        return
+      }
+      const ok = await markExportedAtNow()
+      if (ok) window.dispatchEvent(new CustomEvent('write:characters:changed'))
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  async function exportToKanban() {
+    if (permForm.mode !== 'edit' || exporting) return
+    if (!selectedKanbanColumnId) {
+      setAiErr('칸반 컬럼을 선택해 주세요.')
+      return
+    }
+    setExporting(true)
+    setAiErr(null)
+    try {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        setAiErr('로그인이 필요합니다.')
+        return
+      }
+      const { data: maxRows } = await supabase
+        .from('write_kanban_cards')
+        .select('order_index')
+        .eq('column_id', selectedKanbanColumnId)
+        .eq('user_id', user.id)
+        .order('order_index', { ascending: false })
+        .limit(1)
+      const nextOrder =
+        maxRows && maxRows.length > 0 && typeof maxRows[0].order_index === 'number'
+          ? maxRows[0].order_index + 1
+          : 0
+      const body = [permForm.sections['사건'], permForm.sections['전개']].filter(Boolean).join('\n\n') || null
+      const { error } = await supabase.from('write_kanban_cards').insert({
+        column_id: selectedKanbanColumnId,
+        user_id: user.id,
+        title: permForm.title,
+        body,
+        order_index: nextOrder,
+      })
+      if (error) {
+        setAiErr(error.message ? `내보내기에 실패했습니다: ${error.message}` : '내보내기에 실패했습니다.')
+        return
+      }
+      const ok = await markExportedAtNow()
+      if (ok) setKanbanPickerOpen(false)
+    } finally {
+      setExporting(false)
+    }
   }
 
   function toggleMergeSelection(id: string, checked: boolean) {
@@ -353,6 +537,7 @@ export function PermanentCardModal({
           note_number: nn,
           type: permForm.type,
           title: tt,
+          exported_at: permForm.exported_at ?? null,
           sections: { ...permForm.sections },
         })
         if (!ideaArchiveErr) setAiErr(null)
@@ -508,6 +693,69 @@ export function PermanentCardModal({
             )
           })}
         </div>
+        {permForm.mode === 'edit' ? (
+          <div className="shrink-0 space-y-2 border-t border-[var(--border)] pt-4">
+            {permForm.type === 'event' ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setKanbanPickerOpen((v) => !v)}
+                  disabled={exporting}
+                  className="btn-apple btn-apple-secondary rounded-lg px-3 py-2 text-sm font-semibold disabled:pointer-events-none disabled:opacity-45"
+                >
+                  {alreadyExported ? '내보냄 ✓' : '칸반으로 내보내기'}
+                </button>
+                {kanbanPickerOpen ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={selectedKanbanColumnId}
+                      onChange={(e) => setSelectedKanbanColumnId(e.target.value)}
+                      className="select-apple min-w-[12rem] px-3 py-2 text-sm"
+                      disabled={exporting}
+                    >
+                      {kanbanColumns.length === 0 ? (
+                        <option value="">컬럼 없음</option>
+                      ) : (
+                        kanbanColumns.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.title || '(제목 없음)'}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => void exportToKanban()}
+                      disabled={exporting || !selectedKanbanColumnId}
+                      className="btn-apple btn-apple-primary rounded-lg px-3 py-2 text-sm font-semibold disabled:pointer-events-none disabled:opacity-45"
+                    >
+                      {exporting ? '내보내는 중...' : '내보내기'}
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            ) : permForm.type === 'character' ? (
+              <button
+                type="button"
+                onClick={() => void exportToCharacter('character')}
+                disabled={exporting}
+                className="btn-apple btn-apple-secondary rounded-lg px-3 py-2 text-sm font-semibold disabled:pointer-events-none disabled:opacity-45"
+              >
+                {alreadyExported ? '내보냄 ✓' : '캐릭터로 내보내기'}
+              </button>
+            ) : permForm.type === 'place' ? (
+              <button
+                type="button"
+                onClick={() => void exportToCharacter('place')}
+                disabled={exporting}
+                className="btn-apple btn-apple-secondary rounded-lg px-3 py-2 text-sm font-semibold disabled:pointer-events-none disabled:opacity-45"
+              >
+                {alreadyExported ? '내보냄 ✓' : '장소로 내보내기'}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
         <div className="flex shrink-0 items-center justify-between gap-2 border-t border-[var(--border)] pt-4">
           <div>
             {permForm.mode === 'edit' ? (
@@ -516,7 +764,7 @@ export function PermanentCardModal({
                   type="button"
                   onClick={() => setMergeOpen((v) => !v)}
                   className="btn-apple btn-apple-secondary rounded-lg px-3 py-2 text-sm font-semibold"
-                  disabled={mergeLoading}
+                  disabled={mergeLoading || exporting}
                 >
                   카드 합성
                 </button>
@@ -524,7 +772,7 @@ export function PermanentCardModal({
                   type="button"
                   onClick={() => void deletePermanentCard()}
                   className="rounded-lg px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-500/10"
-                  disabled={mergeLoading}
+                  disabled={mergeLoading || exporting}
                 >
                   삭제
                 </button>
