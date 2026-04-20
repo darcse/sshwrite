@@ -16,10 +16,12 @@ import type {
   PermFormState,
 } from '@/components/editor/ideaBoardShared'
 import { Lightbulb, X } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export type { PermanentCardType } from '@/components/editor/ideaBoardShared'
 export { PERMANENT_SECTION_KEYS } from '@/components/editor/ideaBoardShared'
+
+const PERMANENT_TREE_MIN_PX = 288
 
 export function IdeaBoard({
   projectId,
@@ -34,12 +36,43 @@ export function IdeaBoard({
   const [ideas, setIdeas] = useState<IdeaCardRow[]>([])
   const [permanent, setPermanent] = useState<PermanentCardRow[]>([])
   const [loadErr, setLoadErr] = useState<string | null>(null)
-  const [rightView, setRightView] = useState<'card' | 'tree'>('card')
   const [typeFilter, setTypeFilter] = useState<PermanentCardType | 'all'>('all')
   const [ideaFilter, setIdeaFilter] = useState<'all' | 'active' | 'archived'>('all')
   const [permForm, setPermForm] = useState<PermFormState | null>(null)
+  const [detailPermForm, setDetailPermForm] = useState<PermFormState | null>(null)
+  const [selectedCard, setSelectedCard] = useState<PermanentCardRow | null>(null)
+  const [ideaPanelExpanded, setIdeaPanelExpanded] = useState(true)
   const [transformIdeaId, setTransformIdeaId] = useState<string | null>(null)
   const [aiErr, setAiErr] = useState<string | null>(null)
+  const [permanentTreeWidthPx, setPermanentTreeWidthPx] = useState(PERMANENT_TREE_MIN_PX)
+  const permanentTreeResizeRef = useRef<{ startX: number; startW: number } | null>(null)
+
+  const onPermanentTreeResizeMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      permanentTreeResizeRef.current = {
+        startX: e.clientX,
+        startW: permanentTreeWidthPx,
+      }
+      const onMove = (ev: MouseEvent) => {
+        const d = permanentTreeResizeRef.current
+        if (!d) return
+        const raw = d.startW + (ev.clientX - d.startX)
+        const maxW = Math.max(PERMANENT_TREE_MIN_PX, window.innerWidth - 200)
+        setPermanentTreeWidthPx(
+          Math.max(PERMANENT_TREE_MIN_PX, Math.min(raw, maxW))
+        )
+      }
+      const onUp = () => {
+        permanentTreeResizeRef.current = null
+        window.removeEventListener('mousemove', onMove)
+        window.removeEventListener('mouseup', onUp)
+      }
+      window.addEventListener('mousemove', onMove)
+      window.addEventListener('mouseup', onUp)
+    },
+    [permanentTreeWidthPx]
+  )
 
   const loadAll = useCallback(async () => {
     setLoadErr(null)
@@ -121,6 +154,8 @@ export function IdeaBoard({
     if (!open) {
       setIdeas([])
       setPermanent([])
+      setSelectedCard(null)
+      setDetailPermForm(null)
       return
     }
     void loadAll()
@@ -136,15 +171,22 @@ export function IdeaBoard({
         setAiErr(null)
         return
       }
+      if (detailPermForm) {
+        setDetailPermForm(null)
+        setSelectedCard(null)
+        setAiErr(null)
+        return
+      }
       onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose, permForm])
+  }, [open, onClose, permForm, detailPermForm])
 
-  function openPermanentEditor(c: PermanentCardRow) {
+  function selectPermanentCard(c: PermanentCardRow) {
     setAiErr(null)
-    setPermForm({
+    setSelectedCard(c)
+    setDetailPermForm({
       mode: 'edit',
       id: c.id,
       note_number: c.note_number,
@@ -190,13 +232,13 @@ export function IdeaBoard({
         {loadErr ? (
           <p className="shrink-0 px-4 py-2 text-center text-sm text-red-500">{loadErr}</p>
         ) : null}
-        {aiErr && !permForm ? (
+        {aiErr && !permForm && !detailPermForm ? (
           <p className="shrink-0 px-4 py-2 text-center text-sm text-red-500" role="alert">
             {aiErr}
           </p>
         ) : null}
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
+        <div className="flex min-h-0 flex-1 flex-row overflow-hidden">
           <IdeaCardList
             projectId={projectId}
             ideas={ideas}
@@ -210,15 +252,51 @@ export function IdeaBoard({
             setPermForm={setPermForm}
             setAiErr={setAiErr}
             setLoadErr={setLoadErr}
+            ideaPanelExpanded={ideaPanelExpanded}
+            setIdeaPanelExpanded={setIdeaPanelExpanded}
           />
-          <PermanentCardList
-            permanent={permanent}
-            typeFilter={typeFilter}
-            setTypeFilter={setTypeFilter}
-            rightView={rightView}
-            setRightView={setRightView}
-            onPickCard={openPermanentEditor}
+          <div
+            className="flex min-h-0 shrink-0 flex-col overflow-hidden"
+            style={{
+              width: permanentTreeWidthPx,
+              minWidth: PERMANENT_TREE_MIN_PX,
+            }}
+          >
+            <PermanentCardList
+              permanent={permanent}
+              typeFilter={typeFilter}
+              setTypeFilter={setTypeFilter}
+              selectedCard={selectedCard}
+              onSelectCard={selectPermanentCard}
+            />
+          </div>
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="퍼머넌트 목록 너비 조절"
+            onMouseDown={onPermanentTreeResizeMouseDown}
+            className="w-1.5 shrink-0 cursor-col-resize border-r border-[var(--border)] bg-[var(--background)] hover:bg-[var(--badge-bg)]"
           />
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            {!selectedCard ? (
+              <p className="flex flex-1 items-center justify-center px-4 text-center text-sm text-[var(--muted)]">
+                카드를 선택해주세요
+              </p>
+            ) : detailPermForm ? (
+              <PermanentCardModal
+                isInline
+                projectId={projectId}
+                permForm={detailPermForm}
+                setPermForm={setDetailPermForm}
+                aiErr={aiErr}
+                setAiErr={setAiErr}
+                setPermanent={setPermanent}
+                setIdeas={setIdeas}
+                permanent={permanent}
+                setSelectedCard={setSelectedCard}
+              />
+            ) : null}
+          </div>
         </div>
 
         <div className="shrink-0 border-t border-[var(--border)] px-4 py-2 text-center text-xs text-[var(--muted)]">

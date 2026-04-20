@@ -280,6 +280,62 @@ export function buildTree(cards: PermanentCardRow[]) {
   return root
 }
 
+function longestStrictPrefixParent(
+  childNote: string,
+  cards: PermanentCardRow[]
+): PermanentCardRow | null {
+  let best: PermanentCardRow | null = null
+  let bestLen = -1
+  for (const p of cards) {
+    const pn = p.note_number
+    if (childNote === pn) continue
+    if (childNote.length <= pn.length) continue
+    if (!childNote.startsWith(pn)) continue
+    if (pn.length > bestLen) {
+      bestLen = pn.length
+      best = p
+    }
+  }
+  return best
+}
+
+export function buildZettelkastenTree(cards: PermanentCardRow[]): Map<string, TreeNode> {
+  if (cards.length === 0) return new Map()
+  const sorted = [...cards].sort((a, b) =>
+    a.note_number.localeCompare(b.note_number, undefined, { numeric: true })
+  )
+  const parentById = new Map<string, PermanentCardRow | null>()
+  for (const c of sorted) {
+    parentById.set(c.id, longestStrictPrefixParent(c.note_number, sorted))
+  }
+
+  function buildNode(card: PermanentCardRow): TreeNode {
+    const childCards = sorted.filter((x) => parentById.get(x.id)?.id === card.id)
+    const childKeys = sortSegmentKeys(childCards.map((ch) => ch.note_number))
+    const children = new Map<string, TreeNode>()
+    const byNote = new Map(childCards.map((ch) => [ch.note_number, ch]))
+    for (const note of childKeys) {
+      const ch = byNote.get(note)!
+      children.set(note, buildNode(ch))
+    }
+    return {
+      segment: card.note_number,
+      notePath: card.note_number,
+      card,
+      children,
+    }
+  }
+
+  const roots = sorted.filter((c) => parentById.get(c.id) == null)
+  const root = new Map<string, TreeNode>()
+  const rootKeys = sortSegmentKeys(roots.map((r) => r.note_number))
+  const rootByNote = new Map(roots.map((r) => [r.note_number, r]))
+  for (const note of rootKeys) {
+    root.set(note, buildNode(rootByNote.get(note)!))
+  }
+  return root
+}
+
 export function typeLabel(t: PermanentCardType) {
   if (t === 'event') return '사건'
   if (t === 'character') return '캐릭터'

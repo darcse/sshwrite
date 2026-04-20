@@ -28,6 +28,8 @@ export function PermanentCardModal({
   setPermanent,
   setIdeas,
   permanent,
+  isInline = false,
+  setSelectedCard,
 }: {
   projectId: string
   permForm: PermFormState
@@ -37,6 +39,8 @@ export function PermanentCardModal({
   setPermanent: Dispatch<SetStateAction<PermanentCardRow[]>>
   setIdeas: Dispatch<SetStateAction<IdeaCardRow[]>>
   permanent: PermanentCardRow[]
+  isInline?: boolean
+  setSelectedCard?: Dispatch<SetStateAction<PermanentCardRow | null>>
 }) {
   const [parentId, setParentId] = useState<string | null>(null)
   const [parentNoteNumber, setParentNoteNumber] = useState<string | null>(null)
@@ -80,6 +84,7 @@ export function PermanentCardModal({
   function closeModal() {
     setPermForm(null)
     setAiErr(null)
+    if (isInline) setSelectedCard?.(null)
   }
 
   async function savePermForm() {
@@ -219,6 +224,29 @@ export function PermanentCardModal({
             a.note_number.localeCompare(b.note_number, undefined, { numeric: true })
           )
       )
+      if (isInline) {
+        setSelectedCard?.((prev) =>
+          prev && prev.id === permForm.id
+            ? {
+                ...prev,
+                note_number: nn,
+                type: permForm.type,
+                title: tt,
+                sections: { ...permForm.sections },
+              }
+            : prev
+        )
+        setPermForm({
+          mode: 'edit',
+          id: permForm.id,
+          note_number: nn,
+          type: permForm.type,
+          title: tt,
+          sections: { ...permForm.sections },
+        })
+        if (!ideaArchiveErr) setAiErr(null)
+        return
+      }
     }
     setPermForm(null)
     if (!ideaArchiveErr) setAiErr(null)
@@ -245,18 +273,11 @@ export function PermanentCardModal({
     setPermanent((prev) => prev.filter((c) => c.id !== permForm.id))
     setPermForm(null)
     setAiErr(null)
+    if (isInline) setSelectedCard?.(null)
   }
 
-  return (
-    <div
-      className="fixed inset-0 z-[540] flex items-center justify-center p-5 sm:p-8 modal-overlay-apple"
-      role="presentation"
-      onClick={closeModal}
-    >
-      <div
-        className="modal-panel-apple flex max-h-[min(92vh,52rem)] w-full max-w-4xl flex-col gap-4 overflow-hidden p-5 sm:p-6 shadow-xl"
-        onClick={(ev) => ev.stopPropagation()}
-      >
+  const panelInner = (
+    <>
         <div className="flex shrink-0 items-center justify-between gap-2">
           <span className="text-base font-semibold text-[var(--foreground)]">
             Permanent 카드 {permForm.mode === 'create' ? '생성' : '편집'}
@@ -405,6 +426,30 @@ export function PermanentCardModal({
             </button>
           </div>
         </div>
+    </>
+  )
+
+  if (isInline) {
+    return (
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--background)]">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden p-4 sm:p-5">
+          {panelInner}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[540] flex items-center justify-center p-5 sm:p-8 modal-overlay-apple"
+      role="presentation"
+      onClick={closeModal}
+    >
+      <div
+        className="modal-panel-apple flex max-h-[min(92vh,52rem)] w-full max-w-4xl flex-col gap-4 overflow-hidden p-5 sm:p-6 shadow-xl"
+        onClick={(ev) => ev.stopPropagation()}
+      >
+        {panelInner}
       </div>
     </div>
   )

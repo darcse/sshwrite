@@ -7,7 +7,7 @@ import type {
   PermanentCardType,
 } from '@/components/editor/ideaBoardShared'
 import { nextIndependentNoteNumber, normalizeSections } from '@/components/editor/ideaBoardShared'
-import { Loader2, Plus, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2 } from 'lucide-react'
 import { useMemo } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 
@@ -24,6 +24,8 @@ export function IdeaCardList({
   setPermForm,
   setAiErr,
   setLoadErr,
+  ideaPanelExpanded,
+  setIdeaPanelExpanded,
 }: {
   projectId: string
   ideas: IdeaCardRow[]
@@ -37,6 +39,8 @@ export function IdeaCardList({
   setPermForm: Dispatch<SetStateAction<PermFormState | null>>
   setAiErr: Dispatch<SetStateAction<string | null>>
   setLoadErr: Dispatch<SetStateAction<string | null>>
+  ideaPanelExpanded: boolean
+  setIdeaPanelExpanded: Dispatch<SetStateAction<boolean>>
 }) {
   const displayIdeas = useMemo(() => {
     if (ideaFilter === 'all') return ideas
@@ -183,8 +187,33 @@ export function IdeaCardList({
           ? '아카이브된 아이디어가 없습니다'
           : '아이디어를 입력해보세요'
 
+  if (!ideaPanelExpanded) {
+    return (
+      <section className="flex min-h-0 w-10 shrink-0 flex-col self-stretch border-r border-[var(--border)] bg-[var(--background)]">
+        <button
+          type="button"
+          onClick={() => setIdeaPanelExpanded(true)}
+          className="flex h-11 w-10 shrink-0 items-center justify-center text-[var(--muted)] hover:bg-[var(--badge-bg)] hover:text-[var(--foreground)]"
+          aria-label="아이디어 패널 펼치기"
+        >
+          <ChevronRight className="h-5 w-5" strokeWidth={2} aria-hidden />
+        </button>
+      </section>
+    )
+  }
+
   return (
-    <section className="flex min-h-0 w-full shrink-0 flex-col border-b border-[var(--border)] md:w-[min(42%,28rem)] md:border-b-0 md:border-r">
+    <section className="flex min-h-0 w-72 shrink-0 flex-col self-stretch border-r border-[var(--border)] bg-[var(--background)]">
+      <div className="flex shrink-0 items-center justify-end border-b border-[var(--border)] px-2 py-1">
+        <button
+          type="button"
+          onClick={() => setIdeaPanelExpanded(false)}
+          className="rounded-md p-2 text-[var(--muted)] hover:bg-[var(--badge-bg)] hover:text-[var(--foreground)]"
+          aria-label="아이디어 패널 접기"
+        >
+          <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
+        </button>
+      </div>
       <div className="shrink-0 space-y-2 border-b border-[var(--border)] p-3">
         <textarea
           value={ideaDraft}
@@ -225,7 +254,7 @@ export function IdeaCardList({
           </button>
         ))}
       </div>
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+      <div className="min-h-0 min-w-0 flex-1 space-y-2 overflow-y-auto p-3">
         {displayIdeas.length === 0 ? (
           <p className="py-8 text-center text-sm text-[var(--muted)]">{emptyIdeaHint}</p>
         ) : (
