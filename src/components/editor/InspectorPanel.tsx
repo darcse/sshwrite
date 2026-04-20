@@ -1,13 +1,20 @@
 'use client'
 
 import { useBinderContext } from '@/components/binder/BinderTree'
-import { KanbanCardEditModal, type KCard } from '@/components/editor/KanbanBoard'
+import { PermanentCardModal } from '@/components/editor/PermanentCardModal'
 import { SnapshotPanel } from '@/components/editor/SnapshotPanel'
+import type { IdeaCardRow, PermFormState, PermanentCardRow } from '@/components/editor/ideaBoardShared'
+import {
+  isWritePermanentSectionsUnavailable,
+  parsePermanentRow,
+  typeLabel,
+} from '@/components/editor/ideaBoardShared'
 import { createClient } from '@/lib/supabase/client'
 import { tiptapToPlainText } from '@/lib/doc-utils'
 import { LABEL_COLORS } from '@/lib/workspace-layout'
-import { CheckCircle2, Circle, Loader2, PenLine, X } from 'lucide-react'
+import { CheckCircle2, Circle, Loader2, PenLine, Plus, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 
 export function InspectorPanel() {
   const {
@@ -26,8 +33,15 @@ export function InspectorPanel() {
   const [synopsisDraft, setSynopsisDraft] = useState('')
   const [synopsisGenerating, setSynopsisGenerating] = useState(false)
   const [memoDraft, setMemoDraft] = useState('')
-  const [relatedKanbanCards, setRelatedKanbanCards] = useState<KCard[]>([])
-  const [kanbanModalCard, setKanbanModalCard] = useState<KCard | null>(null)
+  const [relatedPermanentCards, setRelatedPermanentCards] = useState<PermanentCardRow[]>([])
+  const [relatedCardIds, setRelatedCardIds] = useState<string[]>([])
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerSelection, setPickerSelection] = useState<string[]>([])
+  const [pickerSaving, setPickerSaving] = useState(false)
+  const [allPermanentCards, setAllPermanentCards] = useState<PermanentCardRow[]>([])
+  const [allPermanentLoaded, setAllPermanentLoaded] = useState(false)
+  const [permForm, setPermForm] = useState<PermFormState | null>(null)
+  const [permModalErr, setPermModalErr] = useState<string | null>(null)
   const doc = selectedDocId ? documents.find((d) => d.id === selectedDocId) : undefined
   const docLabelId = (doc?.label_id ?? doc?.label) ?? null
   const selectedLabel = labels.find((l) => l.id === docLabelId)
@@ -87,14 +101,16 @@ export function InspectorPanel() {
     return () => clearTimeout(timer)
   }, [memoDraft, doc?.id, refresh])
 
-  const loadRelatedKanbanCards = useCallback(async () => {
+  const loadRelatedPermanentCards = useCallback(async () => {
     if (!selectedDocId) {
-      setRelatedKanbanCards([])
+      setRelatedPermanentCards([])
+      setRelatedCardIds([])
       return
     }
     const d = documents.find((x) => x.id === selectedDocId)
     if (!d || d.type !== 'document') {
-      setRelatedKanbanCards([])
+      setRelatedPermanentCards([])
+      setRelatedCardIds([])
       return
     }
     const supabase = createClient()
@@ -102,53 +118,149 @@ export function InspectorPanel() {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) {
-      setRelatedKanbanCards([])
+      setRelatedPermanentCards([])
+      setRelatedCardIds([])
       return
     }
     const { data: links, error: linkErr } = await supabase
-      .from('write_kanban_card_documents')
+      .from('write_permanent_card_documents')
       .select('card_id')
       .eq('document_id', d.id)
       .eq('user_id', user.id)
     if (linkErr || !links?.length) {
-      setRelatedKanbanCards([])
+      setRelatedPermanentCards([])
+      setRelatedCardIds([])
       return
     }
     const cardIds = links.map((l) => l.card_id)
-    const { data: cardRows, error: cardErr } = await supabase
-      .from('write_kanban_cards')
-      .select('id, column_id, user_id, title, body, order_index, color')
+    setRelatedCardIds(cardIds)
+    const withSections = await supabase
+      .from('write_permanent_cards')
+      .select('id,note_number,type,title,created_at,exported_at,sections')
       .in('id', cardIds)
-    if (cardErr || !cardRows?.length) {
-      setRelatedKanbanCards([])
+      .eq('project_id', projectId)
+      .eq('user_id', user.id)
+    const cardQuery =
+      withSections.error && isWritePermanentSectionsUnavailable(withSections.error)
+        ? await supabase
+            .from('write_permanent_cards')
+            .select('id,note_number,type,title,created_at,exported_at')
+            .in('id', cardIds)
+            .eq('project_id', projectId)
+            .eq('user_id', user.id)
+        : withSections
+    if (cardQuery.error || !cardQuery.data?.length) {
+      setRelatedPermanentCards([])
       return
     }
-    const list = (cardRows as KCard[]).map((raw) => ({
-      ...raw,
-      color: (raw as { color?: string | null }).color ?? null,
-    }))
-    list.sort((a, b) => a.title.localeCompare(b.title, 'ko'))
-    setRelatedKanbanCards(list)
-  }, [selectedDocId, documents])
+    const list = ((cardQuery.data as Record<string, unknown>[]) ?? [])
+      .map((r) => parsePermanentRow(r))
+      .filter((x): x is PermanentCardRow => x != null)
+      .sort((a, b) => a.note_number.localeCompare(b.note_number, undefined, { numeric: true }))
+    setRelatedPermanentCards(list)
+  }, [selectedDocId, documents, projectId])
 
   useEffect(() => {
-    void loadRelatedKanbanCards()
-  }, [loadRelatedKanbanCards])
+    void loadRelatedPermanentCards()
+  }, [loadRelatedPermanentCards])
 
   useEffect(() => {
-    setKanbanModalCard(null)
+    setPermForm(null)
+    setPickerOpen(false)
   }, [selectedDocId])
 
-  useEffect(() => {
-    if (!kanbanModalCard) return
-    function onKey(e: KeyboardEvent) {
-      if (e.key !== 'Escape') return
-      e.preventDefault()
-      setKanbanModalCard(null)
+  const setIdeasNoop: Dispatch<SetStateAction<IdeaCardRow[]>> = () => {}
+  const setPermanentFromModal: Dispatch<SetStateAction<PermanentCardRow[]>> = (next) => {
+    setRelatedPermanentCards((prev) => (typeof next === 'function' ? next(prev) : next))
+    setAllPermanentCards((prev) => (typeof next === 'function' ? next(prev) : next))
+  }
+
+  async function ensureAllPermanentCards() {
+    if (allPermanentLoaded) return
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+    const withSections = await supabase
+      .from('write_permanent_cards')
+      .select('id,note_number,type,title,created_at,exported_at,sections')
+      .eq('project_id', projectId)
+      .eq('user_id', user.id)
+      .order('note_number', { ascending: true })
+    const cardQuery =
+      withSections.error && isWritePermanentSectionsUnavailable(withSections.error)
+        ? await supabase
+            .from('write_permanent_cards')
+            .select('id,note_number,type,title,created_at,exported_at')
+            .eq('project_id', projectId)
+            .eq('user_id', user.id)
+            .order('note_number', { ascending: true })
+        : withSections
+    if (cardQuery.error) return
+    const list = ((cardQuery.data as Record<string, unknown>[]) ?? [])
+      .map((r) => parsePermanentRow(r))
+      .filter((x): x is PermanentCardRow => x != null)
+    setAllPermanentCards(list)
+    setAllPermanentLoaded(true)
+  }
+
+  async function saveRelatedCards() {
+    if (!doc || doc.type !== 'document') return
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+    setPickerSaving(true)
+    const del = await supabase
+      .from('write_permanent_card_documents')
+      .delete()
+      .eq('document_id', doc.id)
+      .eq('user_id', user.id)
+    if (del.error) {
+      setPermModalErr(del.error.message || '연결 저장에 실패했습니다.')
+      setPickerSaving(false)
+      return
     }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [kanbanModalCard])
+    if (pickerSelection.length > 0) {
+      const rows = pickerSelection.map((cardId) => ({
+        card_id: cardId,
+        document_id: doc.id,
+        user_id: user.id,
+      }))
+      const ins = await supabase.from('write_permanent_card_documents').insert(rows)
+      if (ins.error) {
+        setPermModalErr(ins.error.message || '연결 저장에 실패했습니다.')
+        setPickerSaving(false)
+        return
+      }
+    }
+    setPickerOpen(false)
+    setRelatedCardIds(pickerSelection)
+    await loadRelatedPermanentCards()
+    setPickerSaving(false)
+  }
+
+  async function unlinkRelatedCard(cardId: string) {
+    if (!doc || doc.type !== 'document') return
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+    const { error } = await supabase
+      .from('write_permanent_card_documents')
+      .delete()
+      .eq('document_id', doc.id)
+      .eq('card_id', cardId)
+      .eq('user_id', user.id)
+    if (error) {
+      setPermModalErr(error.message || '연결 해제에 실패했습니다.')
+      return
+    }
+    await loadRelatedPermanentCards()
+  }
 
   async function saveLabel() {
     if (!doc || doc.type !== 'document') return
@@ -426,45 +538,127 @@ export function InspectorPanel() {
           className="input-apple w-full resize-none px-2 py-1.5 text-sm"
         />
       </label>
-      <div className="flex flex-col gap-1 text-sm">
-        <span className="text-[var(--muted)]">관련 사건</span>
-        <div className="flex max-h-28 flex-col gap-1.5 overflow-y-auto">
-          {relatedKanbanCards.length === 0 ? (
-            <p className="text-xs text-[var(--muted)]">연결된 사건이 없습니다</p>
-          ) : (
-            relatedKanbanCards.map((c) => (
+      <div className="flex flex-col gap-2 text-sm">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[var(--muted)]">관련 카드</span>
+          <button
+            type="button"
+            onClick={() => {
+              setPickerSelection(relatedCardIds)
+              setPickerOpen((v) => !v)
+              void ensureAllPermanentCards()
+            }}
+            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--foreground)]"
+            style={{ backgroundColor: 'var(--badge-bg)' }}
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden />
+            카드 추가
+          </button>
+        </div>
+        {pickerOpen ? (
+          <div className="space-y-2 rounded-md border border-[var(--border)] bg-[var(--card-bg)] p-2">
+            <div className="max-h-40 space-y-1 overflow-y-auto">
+              {allPermanentCards.map((c) => (
+                <label
+                  key={c.id}
+                  className="grid grid-cols-[auto_auto_auto_minmax(0,1fr)] items-center gap-2 text-xs text-[var(--foreground)]"
+                >
+                  <input
+                    type="checkbox"
+                    checked={pickerSelection.includes(c.id)}
+                    onChange={(e) => {
+                      const checked = e.target.checked
+                      setPickerSelection((prev) =>
+                        checked ? (prev.includes(c.id) ? prev : [...prev, c.id]) : prev.filter((id) => id !== c.id)
+                      )
+                    }}
+                  />
+                  <span className="whitespace-nowrap text-[var(--muted)]">{c.note_number}</span>
+                  <span className="whitespace-nowrap text-[var(--muted)]">[{typeLabel(c.type)}]</span>
+                  <span className="truncate">{c.title}</span>
+                </label>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2">
               <button
-                key={c.id}
                 type="button"
-                onClick={() => setKanbanModalCard(c)}
-                className="w-full truncate rounded-md border border-[var(--border)] bg-[var(--card-bg)] px-3 py-2 text-left text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--badge-bg)]"
+                onClick={() => setPickerOpen(false)}
+                className="rounded px-2 py-1 text-xs text-[var(--muted)]"
               >
-                {c.title}
+                취소
               </button>
+              <button
+                type="button"
+                onClick={() => void saveRelatedCards()}
+                disabled={pickerSaving}
+                className="rounded px-2 py-1 text-xs text-[var(--foreground)] disabled:opacity-50"
+                style={{ backgroundColor: 'var(--badge-bg)' }}
+              >
+                저장
+              </button>
+            </div>
+          </div>
+        ) : null}
+        <div className="flex max-h-40 flex-col gap-1.5 overflow-y-auto">
+          {relatedPermanentCards.length === 0 ? (
+            <p className="text-xs text-[var(--muted)]">연결된 카드가 없습니다</p>
+          ) : (
+            relatedPermanentCards.map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--card-bg)] px-2 py-1.5"
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPermForm({
+                      mode: 'edit',
+                      id: c.id,
+                      note_number: c.note_number,
+                      type: c.type,
+                      title: c.title,
+                      exported_at: c.exported_at,
+                      sections: { ...c.sections },
+                    })
+                  }
+                  className="min-w-0 flex-1 truncate text-left text-xs text-[var(--foreground)]"
+                >
+                  <span className="text-[var(--muted)]">{c.note_number}</span> {c.title}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void unlinkRelatedCard(c.id)}
+                  className="rounded p-1 text-[var(--muted)] hover:text-[var(--foreground)]"
+                  aria-label="연결 해제"
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              </div>
             ))
           )}
         </div>
       </div>
       {saving ? <p className="text-xs text-[var(--muted)]">저장 중…</p> : null}
-      <KanbanCardEditModal
-        card={kanbanModalCard}
-        projectId={projectId}
-        onRequestClose={() => setKanbanModalCard(null)}
-        onSave={async (title, body) => {
-          if (!kanbanModalCard) return
-          const supabase = createClient()
-          const { error } = await supabase
-            .from('write_kanban_cards')
-            .update({ title, body: body || null })
-            .eq('id', kanbanModalCard.id)
-          if (error) {
-            console.error(error)
-            return
-          }
-          setKanbanModalCard(null)
-          await loadRelatedKanbanCards()
-        }}
-      />
+      {permModalErr ? <p className="text-xs text-red-500">{permModalErr}</p> : null}
+      {permForm ? (
+        <PermanentCardModal
+          projectId={projectId}
+          permForm={permForm}
+          setPermForm={(next) => {
+            if (next === null) {
+              setPermForm(null)
+              void loadRelatedPermanentCards()
+              return
+            }
+            setPermForm(next)
+          }}
+          aiErr={permModalErr}
+          setAiErr={setPermModalErr}
+          setPermanent={setPermanentFromModal}
+          setIdeas={setIdeasNoop}
+          permanent={allPermanentCards.length > 0 ? allPermanentCards : relatedPermanentCards}
+        />
+      ) : null}
     </div>
   )
 }
