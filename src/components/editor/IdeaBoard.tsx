@@ -66,7 +66,6 @@ const PERMANENT_DB_KO_TO_EN: Record<PermanentDbTypeKo, PermanentCardType> = {
 
 function typeStringForPermanentInsert(formType: PermanentCardType): string {
   let t: string = PERMANENT_EN_TO_DB_KO[formType] ?? String(formType).trim()
-  console.log(t, JSON.stringify(t))
   if (!(PERMANENT_DB_TYPE_KO as readonly string[]).includes(t)) t = '사건'
   return t
 }
@@ -125,8 +124,6 @@ function normalizeSections(
     const v = o ? o[k] : undefined
     out[k] = typeof v === 'string' ? v : ''
   }
-  console.log('normalizeSections input:', raw)
-  console.log('normalizeSections output:', out)
   return out
 }
 

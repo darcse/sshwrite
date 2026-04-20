@@ -252,7 +252,6 @@ export async function POST(req: Request) {
       .replace(/```json\n?/g, '')
       .replace(/```\n?/g, '')
       .trim()
-    console.log('cleaned text:', cleaned)
     let parsed: unknown
     try {
       parsed = JSON.parse(cleaned)
@@ -277,8 +276,6 @@ export async function POST(req: Request) {
     }
 
     const card = parsed as Record<string, unknown>
-    console.log('parsed card type:', card.type, JSON.stringify(card.type))
-    console.log('raw card JSON:', JSON.stringify(card, null, 2))
     const normalized = normalizePayload(card)
     if (!normalized) {
       return NextResponse.json(
