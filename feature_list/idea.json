@@ -31,5 +31,21 @@
           "변환 중 버튼 비활성화 확인"
         ],
         "passes": true
+      },
+      {
+        "id": "IDEA-003",
+        "category": "idea",
+        "title": "Permanent 카드 간 연결",
+        "description": "Permanent 카드 상세 모달에서 다른 카드와 연결하고, 연결된 카드 목록을 확인하며 연결을 해제할 수 있다. AI가 제안한 link_candidates도 표시된다.",
+        "steps": [
+          "카드 상세 모달에서 연결 추가 버튼 클릭 시 카드 선택 UI 노출 확인",
+          "카드 선택 후 연결 시 write_permanent_card_links에 저장 확인",
+          "모달 하단에 연결된 카드 목록 표시 확인",
+          "연결된 카드 클릭 시 해당 카드 모달로 이동 확인",
+          "연결 해제 버튼 클릭 시 링크 제거 확인",
+          "AI 제안 link_candidates가 모달에 표시되고 클릭 시 연결 추가 확인",
+          "이미 연결된 카드는 선택 UI에서 비활성화 확인"
+        ],
+        "passes": false
       }
 ]
