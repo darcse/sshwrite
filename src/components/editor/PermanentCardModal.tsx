@@ -56,8 +56,23 @@ export function PermanentCardModal({
   const parentResetKey =
     permForm.mode === 'create' ? permForm.ideaId : permForm.mode === 'edit' ? permForm.id : ''
   useEffect(() => {
-    setParentId(null)
-    setParentNoteNumber(null)
+    if (permForm.mode === 'create') {
+      setParentId(null)
+      setParentNoteNumber(null)
+      return
+    }
+    const selfNote = permForm.note_number.trim()
+    let picked: PermanentCardRow | null = null
+    for (const c of sortedForParent) {
+      if (c.id === permForm.id) continue
+      const pn = c.note_number.trim()
+      if (!pn) continue
+      if (!selfNote.startsWith(pn)) continue
+      if (selfNote.length <= pn.length) continue
+      if (!picked || pn.length > picked.note_number.trim().length) picked = c
+    }
+    setParentId(picked?.id ?? null)
+    setParentNoteNumber(picked?.note_number?.trim() ?? null)
   }, [permForm.mode, parentResetKey])
 
   const parentOptions = useMemo(() => {
