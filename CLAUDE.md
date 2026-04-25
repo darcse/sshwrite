@@ -33,6 +33,7 @@ alwaysApply: true
 - 주석 추가 금지
 - Playwright 사용 금지 — 브라우저 테스트는 수동 확인
 - lint/typecheck 직접 실행 금지 — 빌드 결과로만 확인
+- extended thinking 기본 사용 금지, 복잡한 알고리즘·아키텍처 설계 시에만 사용
 
 ---
 
