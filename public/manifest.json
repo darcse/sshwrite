@@ -1,0 +1,28 @@
+{
+  "id": "/",
+  "name": "sshwrite",
+  "short_name": "sshwrite",
+  "description": "소설·가사 집필 워크스페이스",
+  "lang": "ko",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#fbfbfd",
+  "background_color": "#fbfbfd",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

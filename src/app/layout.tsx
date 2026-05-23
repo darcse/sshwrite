@@ -18,6 +18,17 @@ const FAVICON_CACHE_BUST = 2
 
 export const metadata: Metadata = {
   title: 'sshwrite',
+  description: '소설·가사 집필 워크스페이스',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    title: 'sshwrite',
+    statusBarStyle: 'default',
+  },
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#fbfbfd' },
+    { media: '(prefers-color-scheme: dark)', color: '#000000' },
+  ],
   icons: {
     icon: [
       {
@@ -25,6 +36,7 @@ export const metadata: Metadata = {
         sizes: 'any',
       },
     ],
+    apple: [{ url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
   },
 }
 
