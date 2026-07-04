@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { tiptapToPlainText } from '@/lib/doc-utils'
 import { NextResponse } from 'next/server'
 
+export const preferredRegion = 'icn1'
+
 type ReqBody = {
   content?: unknown
   title?: string

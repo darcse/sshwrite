@@ -2,6 +2,8 @@ import { prependWorldviewToSystem } from '@/lib/ai-system-prompt'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+export const preferredRegion = 'icn1'
+
 type ReqBody = {
   kind?: 'character' | 'place'
   worldviewContext?: string

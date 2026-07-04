@@ -2,6 +2,8 @@ import { normalizePayload } from '@/lib/permanent-card-utils'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+export const preferredRegion = 'icn1'
+
 type CardInput = {
   id?: string
   note_number?: string

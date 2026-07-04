@@ -16,6 +16,8 @@ const geistMono = Geist_Mono({
 /** 파비콘 파일을 바꿨는데도 탭 아이콘이 그대로면 숫자만 1 올려서 저장하세요(브라우저 파비콘 캐시 무력화). */
 const FAVICON_CACHE_BUST = 2
 
+export const preferredRegion = 'icn1'
+
 export const metadata: Metadata = {
   title: 'sshwrite',
   description: '소설·가사 집필 워크스페이스',
